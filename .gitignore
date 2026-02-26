@@ -1,0 +1,70 @@
+# .NET / ASP.NET Core
+bin/
+obj/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+*.userprefs
+
+# Build results
+[Dd]ebug/
+[Rr]elease/
+x64/
+x86/
+[Bb]uild/
+bld/
+[Bb]in/
+[Oo]bj/
+[Ll]og/
+[Ll]ogs/
+
+# Visual Studio
+.vs/
+*.vsp
+*.psess
+*.vsp
+*.sap
+
+# Rider
+.idea/
+*.sln.iml
+
+# User-specific files
+appsettings.Development.json
+appsettings.Local.json
+*.user
+*.suo
+*.userosscache
+
+# Database
+*.db
+*.db-shm
+*.db-wal
+*.mdf
+*.ldf
+
+# Secrets
+secrets.json
+.env
+*.pfx
+*.p12
+
+# Migrations (keep in source control, but backup locally)
+# Uncomment if you want to ignore:
+# Migrations/
+
+# Node modules (if using npm for frontend)
+node_modules/
+package-lock.json
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Azure
+*.publishsettings
+*.PublishSettings
+
+# Docker
+docker-compose.override.yml
