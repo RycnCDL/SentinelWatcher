@@ -1,5 +1,5 @@
 using Azure.Core;
-using Azure.Monitor.Query;
+using Azure.Monitor.Query.Logs;
 using Microsoft.Identity.Web;
 
 namespace SentinelWatcher.Api.Services;

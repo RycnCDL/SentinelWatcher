@@ -8,7 +8,7 @@
 
   <ItemGroup>
     <PackageReference Include="Azure.Identity" Version="1.21.0" />
-    <PackageReference Include="Azure.Monitor.Query" Version="1.7.1" />
+    <PackageReference Include="Azure.Monitor.Query.Logs" Version="1.0.0" />
     <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.12" />
     <PackageReference Include="Microsoft.Identity.Web" Version="4.15.0" />
     <!-- Transitive via Microsoft.Identity.Web. Pinned to the patched version for CVE-2026-84008 (GHSA-846f-f764-76mx). -->
