@@ -1,6 +1,6 @@
 import { useIsAuthenticated, useMsal } from '@azure/msal-react';
 import { InteractionStatus } from '@azure/msal-browser';
-import { loginRequest } from './msalConfig';
+import { getApiScopes } from './msal';
 import { ShieldAlert } from 'lucide-react';
 import type { ReactNode } from 'react';
 
@@ -27,10 +27,10 @@ export default function AuthGuard({ children }: AuthGuardProps) {
         <div className="auth-login__card">
           <ShieldAlert size={48} className="auth-login__icon" />
           <h1>Sentinel Watcher</h1>
-          <p>Sign in with your Azure AD account to monitor your Microsoft Sentinel workspaces.</p>
+          <p>Sign in with your Microsoft Entra ID account to monitor your Microsoft Sentinel workspaces.</p>
           <button
             className="auth-login__button"
-            onClick={() => instance.loginRedirect(loginRequest)}
+            onClick={() => instance.loginRedirect({ scopes: getApiScopes() })}
           >
             Sign in with Microsoft
           </button>

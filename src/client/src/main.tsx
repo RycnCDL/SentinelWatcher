@@ -1,23 +1,26 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
-import { PublicClientApplication } from '@azure/msal-browser';
 import { MsalProvider } from '@azure/msal-react';
-import { msalConfig } from './auth/msalConfig';
+import { loadRuntimeConfig } from './config/runtimeConfig';
+import { initMsal } from './auth/msal';
+import StartupError from './components/StartupError';
 import App from './App.tsx';
 import './index.css';
 
-export const msalInstance = new PublicClientApplication(msalConfig);
+const root = createRoot(document.getElementById('root')!);
 
-// Ensure MSAL is fully initialized (redirect handled, cache populated)
-// before rendering the app: prevents 401 race on first API call.
-msalInstance.initialize().then(() => {
-  msalInstance.handleRedirectPromise().then(() => {
-    createRoot(document.getElementById('root')!).render(
+loadRuntimeConfig()
+  .then(initMsal)
+  .then((msalInstance) => {
+    root.render(
       <StrictMode>
         <MsalProvider instance={msalInstance}>
           <App />
         </MsalProvider>
       </StrictMode>,
     );
+  })
+  .catch((err: unknown) => {
+    console.error(err);
+    root.render(<StartupError message={err instanceof Error ? err.message : String(err)} />);
   });
-});

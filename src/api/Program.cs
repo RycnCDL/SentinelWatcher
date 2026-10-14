@@ -1,4 +1,5 @@
 using Microsoft.Identity.Web;
+using SentinelWatcher.Api.Endpoints;
 using SentinelWatcher.Api.Models;
 using SentinelWatcher.Api.Services;
 
@@ -29,20 +30,6 @@ builder.Services.AddScoped<WorkspaceService>();
 // Per-workspace cache manager (singleton, shared across requests)
 builder.Services.AddSingleton<WorkspaceCacheManager>();
 
-// CORS (configurable via appsettings.json)
-var allowedOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>()
-    ?? new[] { "http://localhost:5173", "http://localhost:3000" };
-
-builder.Services.AddCors(options =>
-{
-    options.AddDefaultPolicy(policy =>
-    {
-        policy.WithOrigins(allowedOrigins)
-              .AllowAnyHeader()
-              .AllowAnyMethod();
-    });
-});
-
 builder.Services.AddControllers();
 builder.Services.AddOpenApi();
 
@@ -54,9 +41,19 @@ if (app.Environment.IsDevelopment())
     app.MapOpenApi();
 }
 
-app.UseCors();
+// The SPA is served from wwwroot on the same origin as the API, so no CORS is needed.
+// In local development the Vite dev server proxies /api and /config.json to this app.
+app.UseDefaultFiles();
+app.UseStaticFiles();
+
 app.UseAuthentication();
 app.UseAuthorization();
+
+app.MapClientConfig();
 app.MapControllers();
+
+// Unknown API routes return 404 instead of falling through to the SPA.
+app.MapFallback("/api/{**path}", () => Results.NotFound());
+app.MapFallbackToFile("index.html");
 
 app.Run();

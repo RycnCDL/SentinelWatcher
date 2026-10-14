@@ -1,7 +1,21 @@
-import { defineConfig } from 'vite'
+import { defineConfig, loadEnv } from 'vite'
 import react from '@vitejs/plugin-react'
 
 // https://vite.dev/config/
-export default defineConfig({
-  plugins: [react()],
+export default defineConfig(({ mode }) => {
+  // SW_API_URL can be set in the environment or in .env (see .env.example).
+  const env = loadEnv(mode, process.cwd(), '')
+  const apiUrl = env.SW_API_URL || 'http://localhost:5000'
+
+  return {
+    plugins: [react()],
+    server: {
+      // Forward API and runtime config requests to the local API, so the browser
+      // talks to a single origin in development just like in production.
+      proxy: {
+        '/api': apiUrl,
+        '/config.json': apiUrl,
+      },
+    },
+  }
 })

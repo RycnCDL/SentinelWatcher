@@ -1,6 +1,5 @@
 import axios from 'axios';
-import { apiScopes } from '../auth/msalConfig';
-import { msalInstance } from '../main';
+import { getApiScopes, getMsalInstance } from '../auth/msal';
 import type { WorkspaceInfo } from '../auth/useWorkspace';
 import type {
   AnalyticsRulesResponse,
@@ -10,18 +9,20 @@ import type {
   SentinelHealthResponse,
 } from '../types';
 
+// Same origin in production. In development the Vite dev server proxies /api to the API.
 const api = axios.create({
-  baseURL: import.meta.env.DEV ? 'http://localhost:5000/api' : '/api',
+  baseURL: '/api',
   timeout: 60000,
 });
 
 // Auth interceptor: acquire token silently and attach to every request
 api.interceptors.request.use(async (config) => {
   try {
+    const msalInstance = getMsalInstance();
     const accounts = msalInstance.getAllAccounts();
     if (accounts.length > 0) {
       const response = await msalInstance.acquireTokenSilent({
-        scopes: apiScopes.accessAsUser,
+        scopes: getApiScopes(),
         account: accounts[0],
       });
       config.headers.Authorization = `Bearer ${response.accessToken}`;
