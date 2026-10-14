@@ -18,14 +18,22 @@ public class WorkspaceCacheEntry
 public class WorkspaceCacheManager
 {
     private readonly ConcurrentDictionary<string, WorkspaceCacheEntry> _caches = new();
+    private readonly SentinelService _sentinelService;
+    private readonly LogAnalyticsService _logAnalyticsService;
     private readonly ILogger<WorkspaceCacheManager> _logger;
     private readonly int _refreshMinutes;
     private readonly int _evictMinutes;
 
+    // The services are singletons that call Azure with the app's own identity, so refreshes can
+    // run in the background after the request that triggered them has completed.
     public WorkspaceCacheManager(
+        SentinelService sentinelService,
+        LogAnalyticsService logAnalyticsService,
         IOptions<CacheSettingsConfig> cacheConfig,
         ILogger<WorkspaceCacheManager> logger)
     {
+        _sentinelService = sentinelService;
+        _logAnalyticsService = logAnalyticsService;
         _logger = logger;
         _refreshMinutes = cacheConfig.Value.HeavyQueryRefreshMinutes;
         _evictMinutes = 30;
@@ -59,10 +67,7 @@ public class WorkspaceCacheManager
     /// - Stale cache with data: returns immediately, triggers background refresh.
     /// - No data at all: triggers refresh and waits up to 90 seconds (first load).
     /// </summary>
-    public async Task EnsureDataAvailableAsync(
-        WorkspaceContext workspace,
-        SentinelService sentinelService,
-        LogAnalyticsService logAnalyticsService)
+    public async Task EnsureDataAvailableAsync(WorkspaceContext workspace)
     {
         var workspaceId = workspace.Key;
         if (IsCacheFresh(workspaceId)) return;
@@ -73,13 +78,13 @@ public class WorkspaceCacheManager
         {
             // Stale but usable: return current data and refresh in background
             if (!entry.IsRefreshing)
-                _ = Task.Run(() => RefreshCacheAsync(workspace, sentinelService, logAnalyticsService));
+                _ = Task.Run(() => RefreshCacheAsync(workspace));
             return;
         }
 
         // First load: ensure refresh is running, then wait for data
         if (!entry.IsRefreshing)
-            _ = Task.Run(() => RefreshCacheAsync(workspace, sentinelService, logAnalyticsService));
+            _ = Task.Run(() => RefreshCacheAsync(workspace));
 
         // Poll until data arrives or timeout (90s)
         var deadline = DateTime.UtcNow.AddSeconds(90);
@@ -87,10 +92,7 @@ public class WorkspaceCacheManager
             await Task.Delay(500);
     }
 
-    public async Task RefreshCacheAsync(
-        WorkspaceContext workspace,
-        SentinelService sentinelService,
-        LogAnalyticsService logAnalyticsService)
+    public async Task RefreshCacheAsync(WorkspaceContext workspace)
     {
         var workspaceId = workspace.Key;
         var entry = GetOrCreateEntry(workspace);
@@ -112,14 +114,14 @@ public class WorkspaceCacheManager
 
             // Phase 1: independent queries in parallel
             // GetLastLogPerTableAsync now uses a single union query: much faster than before
-            var rulesTask    = sentinelService.GetAnalyticsRulesAsync(workspace);
-            var ingestionTask = logAnalyticsService.GetIngestionStatsAsync(workspace);
-            var lastLogTask  = logAnalyticsService.GetLastLogPerTableAsync(workspace);
+            var rulesTask    = _sentinelService.GetAnalyticsRulesAsync(workspace);
+            var ingestionTask = _logAnalyticsService.GetIngestionStatsAsync(workspace);
+            var lastLogTask  = _logAnalyticsService.GetLastLogPerTableAsync(workspace);
 
             await Task.WhenAll(rulesTask, ingestionTask, lastLogTask);
 
             // Store partial results immediately after Phase 1 to unblock the frontend.
-            // Analytics: rule list from ARG (name, severity, enabled) with 0 incident counts.
+            // Analytics: rule list from ARM (name, severity, enabled) with 0 incident counts.
             // This lets the rules table render right away; Phase 2 will overwrite with real counts.
             var partialRules = rulesTask.Result;
             entry.AnalyticsRules = new AnalyticsRulesResponse
@@ -138,13 +140,13 @@ public class WorkspaceCacheManager
                 Top20LeastIncidents = new List<AnalyticsRuleStats>()
             };
             entry.Ingestion  = ingestionTask.Result;
-            entry.Connectors = await sentinelService.GetDataConnectorsAsync(workspace, lastLogTask.Result);
+            entry.Connectors = await _sentinelService.GetDataConnectorsAsync(workspace, lastLogTask.Result);
 
             _logger.LogInformation("Phase 1 complete for workspace {Id} in {Ms}ms: data now available to frontend",
                 workspaceId, sw.ElapsedMilliseconds);
 
             // Phase 2: SecurityIncident 30d query (overwrites partial analytics with real incident counts)
-            var analyticsStats = await logAnalyticsService.GetAnalyticsRuleStatsAsync(workspace, rulesTask.Result);
+            var analyticsStats = await _logAnalyticsService.GetAnalyticsRuleStatsAsync(workspace, rulesTask.Result);
             entry.AnalyticsRules = analyticsStats;
             entry.LastRefreshed  = DateTime.UtcNow;
 

@@ -8,19 +8,11 @@ namespace SentinelWatcher.Api.Controllers;
 public class IngestionController : WorkspaceControllerBase
 {
     private readonly WorkspaceCacheManager _cacheManager;
-    private readonly SentinelService _sentinelService;
-    private readonly LogAnalyticsService _logAnalyticsService;
 
-    public IngestionController(
-        WorkspaceRegistry registry,
-        WorkspaceCacheManager cacheManager,
-        SentinelService sentinelService,
-        LogAnalyticsService logAnalyticsService)
+    public IngestionController(WorkspaceRegistry registry, WorkspaceCacheManager cacheManager)
         : base(registry)
     {
         _cacheManager = cacheManager;
-        _sentinelService = sentinelService;
-        _logAnalyticsService = logAnalyticsService;
     }
 
     [HttpGet]
@@ -29,7 +21,7 @@ public class IngestionController : WorkspaceControllerBase
         var ws = ResolveWorkspace(workspace, out var error);
         if (ws is null) return error!;
 
-        await _cacheManager.EnsureDataAvailableAsync(ws, _sentinelService, _logAnalyticsService);
+        await _cacheManager.EnsureDataAvailableAsync(ws);
 
         var entry = _cacheManager.GetOrCreateEntry(ws);
         if (entry.Ingestion == null)

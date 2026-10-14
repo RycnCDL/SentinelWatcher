@@ -7,16 +7,16 @@ namespace SentinelWatcher.Api.Services;
 
 public class LogAnalyticsService
 {
-    private readonly UserAzureClientFactory _clientFactory;
+    private readonly LogsQueryClient _logsClient;
     private readonly CacheSettingsConfig _cacheConfig;
     private readonly ILogger<LogAnalyticsService> _logger;
 
     public LogAnalyticsService(
-        UserAzureClientFactory clientFactory,
+        LogsQueryClient logsClient,
         IOptions<CacheSettingsConfig> cacheConfig,
         ILogger<LogAnalyticsService> logger)
     {
-        _clientFactory = clientFactory;
+        _logsClient = logsClient;
         _cacheConfig = cacheConfig.Value;
         _logger = logger;
     }
@@ -25,7 +25,7 @@ public class LogAnalyticsService
         WorkspaceContext workspace,
         List<(string Id, string Name, string Severity, bool Enabled)> rules)
     {
-        var logsClient = await _clientFactory.CreateLogsQueryClientAsync();
+        var logsClient = _logsClient;
         var response = new AnalyticsRulesResponse
         {
             LastRefreshed = DateTime.UtcNow,
@@ -100,7 +100,7 @@ public class LogAnalyticsService
 
     public async Task<IngestionResponse> GetIngestionStatsAsync(WorkspaceContext workspace)
     {
-        var logsClient = await _clientFactory.CreateLogsQueryClientAsync();
+        var logsClient = _logsClient;
         var response = new IngestionResponse
         {
             DaysAnalyzed = 30,
@@ -222,7 +222,7 @@ public class LogAnalyticsService
 
     public async Task<Dictionary<string, DateTime?>> GetLastLogPerTableAsync(WorkspaceContext workspace)
     {
-        var logsClient = await _clientFactory.CreateLogsQueryClientAsync();
+        var logsClient = _logsClient;
         var result = new Dictionary<string, DateTime?>();
 
         _logger.LogInformation("Querying last log times for {Count} tables via single union query...", ImportantTables.Length);
@@ -307,7 +307,7 @@ public class LogAnalyticsService
 
     public async Task<SentinelHealthResponse> GetSentinelHealthAsync(WorkspaceContext workspace, int days = 7)
     {
-        var logsClient = await _clientFactory.CreateLogsQueryClientAsync();
+        var logsClient = _logsClient;
         var response = new SentinelHealthResponse { QueryTime = DateTime.UtcNow };
 
         // Quick probe: does the workspace have any SentinelHealth data?

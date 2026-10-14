@@ -13,4 +13,10 @@ public class SentinelOptions
     /// This list is the only source of workspaces: requests for any other workspace are rejected.
     /// </summary>
     public List<string> Workspaces { get; set; } = new();
+
+    /// <summary>
+    /// Client ID of the user-assigned managed identity used for all Azure calls.
+    /// When empty, DefaultAzureCredential is used (for local development with az login).
+    /// </summary>
+    public string? ManagedIdentityClientId { get; set; }
 }

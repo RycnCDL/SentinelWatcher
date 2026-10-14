@@ -1,3 +1,6 @@
+using Azure.Core;
+using Azure.Monitor.Query.Logs;
+using Microsoft.Extensions.Options;
 using Microsoft.Identity.Web;
 using SentinelWatcher.Api.Endpoints;
 using SentinelWatcher.Api.Models;
@@ -14,22 +17,29 @@ builder.Services.Configure<SentinelOptions>(
 // Workspace allow-list (Sentinel:Workspaces): the only workspaces the app reads.
 builder.Services.AddSingleton<WorkspaceRegistry>();
 
-// Azure AD authentication with OBO flow
-builder.Services.AddMicrosoftIdentityWebApiAuthentication(builder.Configuration)
-    .EnableTokenAcquisitionToCallDownstreamApi()
-    .AddInMemoryTokenCaches();
+// Sign-in: validate Entra ID access tokens issued for this app. The API never calls
+// Azure on behalf of the user, so no client secret is needed.
+builder.Services.AddMicrosoftIdentityWebApiAuthentication(builder.Configuration);
 
-// Azure client factory (creates per-request clients using user's OBO token)
-builder.Services.AddScoped<UserAzureClientFactory>();
-builder.Services.AddHttpClient<ArmRestClient>();
+// Azure access: one identity for the whole app (user-assigned managed identity in Azure,
+// DefaultAzureCredential such as az login for local development).
+builder.Services.AddSingleton<TokenCredential>(sp => AzureCredentialFactory.Create(
+    sp.GetRequiredService<IOptions<SentinelOptions>>().Value,
+    sp.GetRequiredService<ILoggerFactory>().CreateLogger("SentinelWatcher.Azure")));
+builder.Services.AddSingleton<AzureTokenProvider>();
+builder.Services.AddSingleton(sp => new LogsQueryClient(sp.GetRequiredService<TokenCredential>()));
+builder.Services.AddHttpClient(nameof(ArmRestClient));
+builder.Services.AddSingleton<ArmRestClient>();
 
-builder.Services.AddScoped<IWorkspaceStatusProvider, SentinelStatusProvider>();
-builder.Services.AddScoped<SentinelService>();
-builder.Services.AddScoped<LogAnalyticsService>();
-builder.Services.AddScoped<DataCollectionRuleService>();
-builder.Services.AddScoped<WorkspaceService>();
+// All Azure-calling services are singletons: they hold no per-request state, which lets
+// the cache refresh run in the background after the triggering request has finished.
+builder.Services.AddSingleton<IWorkspaceStatusProvider, SentinelStatusProvider>();
+builder.Services.AddSingleton<SentinelService>();
+builder.Services.AddSingleton<LogAnalyticsService>();
+builder.Services.AddSingleton<DataCollectionRuleService>();
+builder.Services.AddSingleton<WorkspaceService>();
 
-// Per-workspace cache manager (singleton, shared across requests)
+// Per-workspace cache, shared by all viewers (everyone sees data read by the same identity).
 builder.Services.AddSingleton<WorkspaceCacheManager>();
 
 builder.Services.AddControllers();

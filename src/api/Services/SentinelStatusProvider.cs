@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using SentinelWatcher.Api.Models;
 
 namespace SentinelWatcher.Api.Services;
@@ -17,9 +18,11 @@ public class SentinelStatusProvider : IWorkspaceStatusProvider
 {
     private const string SolutionApiVersion = "2015-11-01-preview";
     private const string OnboardingApiVersion = "2024-03-01";
+    private static readonly TimeSpan CacheDuration = TimeSpan.FromMinutes(15);
 
     private readonly ArmRestClient _arm;
     private readonly ILogger<SentinelStatusProvider> _logger;
+    private readonly ConcurrentDictionary<string, (bool Enabled, DateTimeOffset CheckedAt)> _cache = new();
 
     public SentinelStatusProvider(ArmRestClient arm, ILogger<SentinelStatusProvider> logger)
     {
@@ -28,6 +31,16 @@ public class SentinelStatusProvider : IWorkspaceStatusProvider
     }
 
     public async Task<bool> IsSentinelEnabledAsync(WorkspaceContext workspace, CancellationToken cancellationToken)
+    {
+        if (_cache.TryGetValue(workspace.Key, out var cached) && DateTimeOffset.UtcNow - cached.CheckedAt < CacheDuration)
+            return cached.Enabled;
+
+        var enabled = await CheckAsync(workspace, cancellationToken);
+        _cache[workspace.Key] = (enabled, DateTimeOffset.UtcNow);
+        return enabled;
+    }
+
+    private async Task<bool> CheckAsync(WorkspaceContext workspace, CancellationToken cancellationToken)
     {
         var solutionPath =
             $"/subscriptions/{workspace.SubscriptionId}/resourceGroups/{workspace.ResourceGroup}" +

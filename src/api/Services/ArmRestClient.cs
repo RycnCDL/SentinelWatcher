@@ -11,15 +11,16 @@ namespace SentinelWatcher.Api.Services;
 public class ArmRestClient
 {
     public const string BaseUrl = "https://management.azure.com";
+    private const string Scope = "https://management.azure.com/.default";
 
-    private readonly HttpClient _httpClient;
-    private readonly UserAzureClientFactory _clientFactory;
+    private readonly IHttpClientFactory _httpClientFactory;
+    private readonly AzureTokenProvider _tokenProvider;
     private readonly ILogger<ArmRestClient> _logger;
 
-    public ArmRestClient(HttpClient httpClient, UserAzureClientFactory clientFactory, ILogger<ArmRestClient> logger)
+    public ArmRestClient(IHttpClientFactory httpClientFactory, AzureTokenProvider tokenProvider, ILogger<ArmRestClient> logger)
     {
-        _httpClient = httpClient;
-        _clientFactory = clientFactory;
+        _httpClientFactory = httpClientFactory;
+        _tokenProvider = tokenProvider;
         _logger = logger;
     }
 
@@ -75,9 +76,9 @@ public class ArmRestClient
 
     private async Task<HttpResponseMessage> SendAsync(string url, CancellationToken cancellationToken)
     {
-        var token = await _clientFactory.GetArmAccessTokenAsync();
+        var token = await _tokenProvider.GetTokenAsync(Scope, cancellationToken);
         using var request = new HttpRequestMessage(HttpMethod.Get, url);
         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
-        return await _httpClient.SendAsync(request, cancellationToken);
+        return await _httpClientFactory.CreateClient(nameof(ArmRestClient)).SendAsync(request, cancellationToken);
     }
 }
