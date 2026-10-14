@@ -50,8 +50,9 @@ export default function Ingestion() {
   const { selectedWorkspace } = useWorkspace();
   const [data, setData] = useState<IngestionResponse | null>(null);
   const [connectors, setConnectors] = useState<DataConnectorsResponse | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [settledKey, setSettledKey] = useState<string | null>(null);
   const [selectedConnector, setSelectedConnector] = useState<string>('all');
+  const loading = !selectedWorkspace || settledKey !== selectedWorkspace.workspaceId;
 
   useEffect(() => {
     if (!selectedWorkspace) return;
@@ -62,10 +63,9 @@ export default function Ingestion() {
         if (ing.status === 'fulfilled') setData(ing.value);
         if (conn.status === 'fulfilled') setConnectors(conn.value);
       } finally {
-        setLoading(false);
+        setSettledKey(ws.workspaceId);
       }
     }
-    setLoading(true);
     fetchData();
     const interval = setInterval(fetchData, 60000);
     return () => clearInterval(interval);
@@ -172,7 +172,7 @@ export default function Ingestion() {
                     />
                     <Tooltip
                       contentStyle={tooltipStyle}
-                      formatter={(value: number | undefined) => value != null ? `${value.toFixed(2)} GB` : '0 GB'}
+                      formatter={(value) => (typeof value === 'number' ? `${value.toFixed(2)} GB` : '0 GB')}
                     />
                     <Bar dataKey="volumeGB" fill="#3B82F6" radius={[0, 4, 4, 0]} style={{ filter: 'drop-shadow(0 4px 8px rgba(59, 130, 246, 0.3))' }} />
                   </BarChart>
@@ -207,7 +207,7 @@ export default function Ingestion() {
                     </Pie>
                     <Tooltip
                       contentStyle={tooltipStyle}
-                      formatter={(value: number | undefined) => value != null ? `${value.toFixed(2)} GB` : '0 GB'}
+                      formatter={(value) => (typeof value === 'number' ? `${value.toFixed(2)} GB` : '0 GB')}
                     />
                   </PieChart>
                 </ResponsiveContainer>

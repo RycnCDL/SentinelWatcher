@@ -27,8 +27,9 @@ const STATUS_COLOR: Record<string, string> = {
 export default function DataCollectionRules() {
   const { selectedWorkspace } = useWorkspace();
   const [data, setData] = useState<DcrResponse | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [settledKey, setSettledKey] = useState<string | null>(null);
   const [expanded, setExpanded] = useState<string | null>(null);
+  const loading = !selectedWorkspace || settledKey !== selectedWorkspace.workspaceId;
 
   useEffect(() => {
     if (!selectedWorkspace) return;
@@ -38,10 +39,9 @@ export default function DataCollectionRules() {
         const result = await getDcr(ws);
         setData(result);
       } finally {
-        setLoading(false);
+        setSettledKey(ws.workspaceId);
       }
     }
-    setLoading(true);
     fetchData();
     const interval = setInterval(fetchData, 60000);
     return () => clearInterval(interval);

@@ -94,8 +94,9 @@ function ConnectorCard({ connector }: { connector: ConnectorHealth }) {
 export default function DataConnectors() {
   const { selectedWorkspace } = useWorkspace();
   const [data, setData] = useState<DataConnectorsResponse | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [settledKey, setSettledKey] = useState<string | null>(null);
   const [filter, setFilter] = useState<string>('all');
+  const loading = !selectedWorkspace || settledKey !== selectedWorkspace.workspaceId;
 
   const fetchData = useCallback(async () => {
     if (!selectedWorkspace) return;
@@ -103,12 +104,11 @@ export default function DataConnectors() {
       const result = await getDataConnectors(selectedWorkspace);
       setData(result);
     } finally {
-      setLoading(false);
+      setSettledKey(selectedWorkspace.workspaceId);
     }
   }, [selectedWorkspace]);
 
   useEffect(() => {
-    setLoading(true);
     fetchData();
     const interval = setInterval(fetchData, 60000);
     return () => clearInterval(interval);

@@ -44,7 +44,8 @@ export default function Dashboard() {
   const [ingestion, setIngestion]   = useState<IngestionResponse | null>(null);
   const [connectors, setConnectors] = useState<DataConnectorsResponse | null>(null);
   const [dcr, setDcr]               = useState<DcrResponse | null>(null);
-  const [loading, setLoading]       = useState(true);
+  const [settledKey, setSettledKey] = useState<string | null>(null);
+  const loading = !selectedWorkspace || settledKey !== selectedWorkspace.workspaceId;
   const chart = useChartTheme();
 
   useEffect(() => {
@@ -61,10 +62,9 @@ export default function Dashboard() {
         if (c.status === 'fulfilled') setConnectors(c.value);
         if (d.status === 'fulfilled') setDcr(d.value);
       } finally {
-        setLoading(false);
+        setSettledKey(ws.workspaceId);
       }
     }
-    setLoading(true);
     fetchAll();
     const interval = setInterval(fetchAll, 60_000);
     return () => clearInterval(interval);

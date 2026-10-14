@@ -27,8 +27,9 @@ export default function AnalyticsRules() {
   const { selectedWorkspace } = useWorkspace();
   const { tooltipStyle, gridStroke, axisStroke, axisTickFill } = useChartTheme();
   const [data, setData] = useState<AnalyticsRulesResponse | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [settledKey, setSettledKey] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+  const loading = !selectedWorkspace || settledKey !== selectedWorkspace.workspaceId;
 
   const fetchData = useCallback(async () => {
     if (!selectedWorkspace) return;
@@ -36,7 +37,7 @@ export default function AnalyticsRules() {
       const result = await getAnalyticsRules(selectedWorkspace);
       setData(result);
     } finally {
-      setLoading(false);
+      setSettledKey(selectedWorkspace.workspaceId);
     }
   }, [selectedWorkspace]);
 
@@ -52,7 +53,6 @@ export default function AnalyticsRules() {
   }
 
   useEffect(() => {
-    setLoading(true);
     fetchData();
     const interval = setInterval(fetchData, 60000);
     return () => clearInterval(interval);
