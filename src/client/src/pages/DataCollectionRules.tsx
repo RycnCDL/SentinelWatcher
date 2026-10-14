@@ -5,7 +5,7 @@ import {
   XCircle,
   HelpCircle,
 } from 'lucide-react';
-import { useWorkspace } from '../auth/WorkspaceContext';
+import { useWorkspace } from '../auth/useWorkspace';
 import { getDcr } from '../services/api';
 import type { DcrResponse } from '../types';
 import StatusCard from '../components/StatusCard';

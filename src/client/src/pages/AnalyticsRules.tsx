@@ -10,7 +10,7 @@ import {
   Cell,
 } from 'recharts';
 import { RefreshCw } from 'lucide-react';
-import { useWorkspace } from '../auth/WorkspaceContext';
+import { useWorkspace } from '../auth/useWorkspace';
 import { getAnalyticsRules, refreshAnalyticsRules } from '../services/api';
 import { useChartTheme } from '../hooks/useTheme';
 import type { AnalyticsRulesResponse } from '../types';

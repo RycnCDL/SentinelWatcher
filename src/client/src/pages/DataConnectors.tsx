@@ -5,7 +5,7 @@ import {
   XCircle,
   HelpCircle,
 } from 'lucide-react';
-import { useWorkspace } from '../auth/WorkspaceContext';
+import { useWorkspace } from '../auth/useWorkspace';
 import { getDataConnectors } from '../services/api';
 import type { DataConnectorsResponse, ConnectorHealth } from '../types';
 

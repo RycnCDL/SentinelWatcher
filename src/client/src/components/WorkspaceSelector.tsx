@@ -1,4 +1,4 @@
-import { useWorkspace } from '../auth/WorkspaceContext';
+import { useWorkspace } from '../auth/useWorkspace';
 import { ChevronDown } from 'lucide-react';
 import { useState, useRef, useEffect } from 'react';
 

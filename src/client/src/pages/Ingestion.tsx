@@ -12,7 +12,7 @@ import {
   Pie,
   Cell,
 } from 'recharts';
-import { useWorkspace } from '../auth/WorkspaceContext';
+import { useWorkspace } from '../auth/useWorkspace';
 import { getIngestion, getDataConnectors } from '../services/api';
 import type { IngestionResponse, DataConnectorsResponse } from '../types';
 

@@ -1,37 +1,7 @@
-import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from 'react';
+import { useState, useEffect, useCallback, type ReactNode } from 'react';
+import { isAxiosError } from 'axios';
 import { getWorkspaces } from '../services/api';
-
-export interface WorkspaceInfo {
-  subscriptionId: string;
-  subscriptionName: string;
-  resourceGroup: string;
-  workspaceName: string;
-  workspaceId: string;
-  location: string;
-  sentinelEnabled: boolean;
-}
-
-interface WorkspaceContextType {
-  workspaces: WorkspaceInfo[];
-  selectedWorkspace: WorkspaceInfo | null;
-  switchWorkspace: (workspace: WorkspaceInfo) => void;
-  loading: boolean;
-  error: string | null;
-  refresh: () => void;
-}
-
-const WorkspaceCtx = createContext<WorkspaceContextType>({
-  workspaces: [],
-  selectedWorkspace: null,
-  switchWorkspace: () => {},
-  loading: true,
-  error: null,
-  refresh: () => {},
-});
-
-export function useWorkspace() {
-  return useContext(WorkspaceCtx);
-}
+import { WorkspaceCtx, type WorkspaceInfo } from './useWorkspace';
 
 const STORAGE_KEY = 'sw-selected-workspace';
 
@@ -58,9 +28,9 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
         setSelectedWorkspace(data[0]);
         localStorage.setItem(STORAGE_KEY, data[0].workspaceId);
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       // If 401, token may not be ready yet — retry once after a short delay
-      if (err?.response?.status === 401 && !retried) {
+      if (isAxiosError(err) && err.response?.status === 401 && !retried) {
         setTimeout(() => loadWorkspaces(true), 1000);
         return;
       }

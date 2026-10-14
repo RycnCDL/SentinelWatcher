@@ -8,7 +8,7 @@ import {
   CheckCircle, Activity, TrendingUp, ShieldCheck,
 } from 'lucide-react';
 import StatusCard from '../components/StatusCard';
-import { useWorkspace } from '../auth/WorkspaceContext';
+import { useWorkspace } from '../auth/useWorkspace';
 import { getAnalyticsRules, getIngestion, getDataConnectors, getDcr } from '../services/api';
 import type { AnalyticsRulesResponse, IngestionResponse, DataConnectorsResponse, DcrResponse } from '../types';
 import { useChartTheme } from '../hooks/useTheme';
@@ -21,8 +21,10 @@ const SEVERITY_COLORS: Record<string, string> = {
 };
 
 function RelativeTime({ iso }: { iso: string | null }) {
+  // Capture the clock once per mount so rendering stays pure.
+  const [now] = useState(Date.now);
   if (!iso) return <span style={{ color: 'var(--text-muted)' }}>—</span>;
-  const diff = Date.now() - new Date(iso).getTime();
+  const diff = now - new Date(iso).getTime();
   const h = Math.floor(diff / 3_600_000);
   const d = Math.floor(h / 24);
   const label = d > 0 ? `${d}d ago` : h > 0 ? `${h}h ago` : 'just now';

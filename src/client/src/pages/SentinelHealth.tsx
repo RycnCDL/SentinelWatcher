@@ -4,7 +4,7 @@ import {
   PieChart, Pie, Cell, Legend,
 } from 'recharts';
 import { AlertTriangle, HeartPulse, ShieldOff, Zap, Wifi } from 'lucide-react';
-import { useWorkspace } from '../auth/WorkspaceContext';
+import { useWorkspace } from '../auth/useWorkspace';
 import { getSentinelHealth } from '../services/api';
 import type {
   SentinelHealthResponse,
@@ -148,19 +148,23 @@ const PIE_COLORS: Record<string, string> = {
 export default function SentinelHealth() {
   const { selectedWorkspace } = useWorkspace();
   const [data, setData] = useState<SentinelHealthResponse | null>(null);
-  const [loading, setLoading] = useState(true);
   const [days, setDays] = useState(7);
+  // Key of the last request that finished (successfully or not). Loading is derived
+  // from it instead of being set synchronously inside the effect.
+  const [settledKey, setSettledKey] = useState<string | null>(null);
   const [connectorFilter, setConnectorFilter] = useState<'all' | 'issues'>('all');
   const chart = useChartTheme();
 
+  const requestKey = selectedWorkspace ? `${selectedWorkspace.workspaceId}|${days}` : null;
+  const loading = requestKey === null || settledKey !== requestKey;
+
   useEffect(() => {
-    if (!selectedWorkspace) return;
-    setLoading(true);
+    if (!selectedWorkspace || requestKey === null) return;
     getSentinelHealth(selectedWorkspace, days)
       .then(setData)
       .catch(console.error)
-      .finally(() => setLoading(false));
-  }, [selectedWorkspace, days]);
+      .finally(() => setSettledKey(requestKey));
+  }, [selectedWorkspace, days, requestKey]);
 
   if (loading) return <div className="loading">Loading Sentinel Health…</div>;
 

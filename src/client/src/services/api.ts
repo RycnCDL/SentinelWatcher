@@ -1,7 +1,7 @@
 import axios from 'axios';
 import { apiScopes } from '../auth/msalConfig';
 import { msalInstance } from '../main';
-import type { WorkspaceInfo } from '../auth/WorkspaceContext';
+import type { WorkspaceInfo } from '../auth/useWorkspace';
 import type {
   AnalyticsRulesResponse,
   IngestionResponse,
