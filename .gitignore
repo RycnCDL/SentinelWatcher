@@ -1,70 +1,47 @@
-# .NET / ASP.NET Core
+# .NET build output
 bin/
 obj/
+publish/
 *.user
 *.suo
-*.userosscache
-*.sln.docstates
-*.userprefs
-
-# Build results
-[Dd]ebug/
-[Rr]elease/
-x64/
-x86/
-[Bb]uild/
-bld/
-[Bb]in/
-[Oo]bj/
-[Ll]og/
-[Ll]ogs/
-
-# Visual Studio
 .vs/
-*.vsp
-*.psess
-*.vsp
-*.sap
+TestResults/
 
-# Rider
-.idea/
-*.sln.iml
-
-# User-specific files
+# Local configuration with real values. Commit only the *.sample / *.example files.
 appsettings.Development.json
 appsettings.Local.json
-*.user
-*.suo
-*.userosscache
-
-# Database
-*.db
-*.db-shm
-*.db-wal
-*.mdf
-*.ldf
-
-# Secrets
+local.settings.json
 secrets.json
 .env
+.env.*
+!.env.example
+
+# Node / Vite
+node_modules/
+dist/
+dist-ssr/
+*.local
+
+# SPA build copied into the API for packaging
+src/api/wwwroot/
+
+# Release artifacts
+artifacts/
+*.zip
+
+# Certificates and keys
 *.pfx
 *.p12
+*.pem
+*.key
 
-# Migrations (keep in source control, but backup locally)
-# Uncomment if you want to ignore:
-# Migrations/
-
-# Node modules (if using npm for frontend)
-node_modules/
-package-lock.json
+# Local agent and editor settings
+.claude/
+.idea/
+.vscode/*
+!.vscode/extensions.json
 
 # OS
 .DS_Store
 Thumbs.db
-
-# Azure
-*.publishsettings
-*.PublishSettings
-
-# Docker
-docker-compose.override.yml
+*.log
