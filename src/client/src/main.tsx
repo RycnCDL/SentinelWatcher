@@ -9,7 +9,7 @@ import './index.css';
 export const msalInstance = new PublicClientApplication(msalConfig);
 
 // Ensure MSAL is fully initialized (redirect handled, cache populated)
-// before rendering the app — prevents 401 race on first API call.
+// before rendering the app: prevents 401 race on first API call.
 msalInstance.initialize().then(() => {
   msalInstance.handleRedirectPromise().then(() => {
     createRoot(document.getElementById('root')!).render(

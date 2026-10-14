@@ -71,13 +71,13 @@ public class WorkspaceCacheManager
 
         if (HasAnyData(workspaceId))
         {
-            // Stale but usable — return current data and refresh in background
+            // Stale but usable: return current data and refresh in background
             if (!entry.IsRefreshing)
                 _ = Task.Run(() => RefreshCacheAsync(workspaceId, workspace, sentinelService, logAnalyticsService));
             return;
         }
 
-        // First load — ensure refresh is running, then wait for data
+        // First load: ensure refresh is running, then wait for data
         if (!entry.IsRefreshing)
             _ = Task.Run(() => RefreshCacheAsync(workspaceId, workspace, sentinelService, logAnalyticsService));
 
@@ -111,7 +111,7 @@ public class WorkspaceCacheManager
             var sw = System.Diagnostics.Stopwatch.StartNew();
 
             // Phase 1: independent queries in parallel
-            // GetLastLogPerTableAsync now uses a single union query — much faster than before
+            // GetLastLogPerTableAsync now uses a single union query: much faster than before
             var rulesTask    = sentinelService.GetAnalyticsRulesAsync(workspace);
             var ingestionTask = logAnalyticsService.GetIngestionStatsAsync(workspace);
             var lastLogTask  = logAnalyticsService.GetLastLogPerTableAsync(workspace);
@@ -140,7 +140,7 @@ public class WorkspaceCacheManager
             entry.Ingestion  = ingestionTask.Result;
             entry.Connectors = await sentinelService.GetDataConnectorsAsync(workspace, lastLogTask.Result);
 
-            _logger.LogInformation("Phase 1 complete for workspace {Id} in {Ms}ms — data now available to frontend",
+            _logger.LogInformation("Phase 1 complete for workspace {Id} in {Ms}ms: data now available to frontend",
                 workspaceId, sw.ElapsedMilliseconds);
 
             // Phase 2: SecurityIncident 30d query (overwrites partial analytics with real incident counts)

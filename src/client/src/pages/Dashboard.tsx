@@ -23,7 +23,7 @@ const SEVERITY_COLORS: Record<string, string> = {
 function RelativeTime({ iso }: { iso: string | null }) {
   // Capture the clock once per mount so rendering stays pure.
   const [now] = useState(Date.now);
-  if (!iso) return <span style={{ color: 'var(--text-muted)' }}>—</span>;
+  if (!iso) return <span style={{ color: 'var(--text-muted)' }}>-</span>;
   const diff = now - new Date(iso).getTime();
   const h = Math.floor(diff / 3_600_000);
   const d = Math.floor(h / 24);
@@ -125,21 +125,21 @@ export default function Dashboard() {
       <div className="cards-grid">
         <StatusCard
           title="Analytics Rules"
-          value={analytics?.totalRules ?? '—'}
+          value={analytics?.totalRules ?? '-'}
           subtitle={`${analytics?.totalIncidents ?? 0} incidents · ${enabledCount} enabled`}
           icon={<ShieldAlert size={24} />}
           color="blue"
         />
         <StatusCard
           title="Log Ingestion (30d)"
-          value={`${ingestion?.totalVolumeGB?.toFixed(1) ?? '—'} GB`}
-          subtitle={`Est. $${ingestion?.totalEstimatedCostUSD?.toFixed(2) ?? '—'} · ${ingestion?.tables?.length ?? 0} tables`}
+          value={`${ingestion?.totalVolumeGB?.toFixed(1) ?? '-'} GB`}
+          subtitle={`Est. $${ingestion?.totalEstimatedCostUSD?.toFixed(2) ?? '-'} · ${ingestion?.tables?.length ?? 0} tables`}
           icon={<Database size={24} />}
           color="purple"
         />
         <StatusCard
           title="Connectors Healthy"
-          value={`${connectors?.healthyCount ?? '—'} / ${connectors?.connectors?.length ?? '—'}`}
+          value={`${connectors?.healthyCount ?? '-'} / ${connectors?.connectors?.length ?? '-'}`}
           subtitle={
             connectorErrorCount > 0 ? `${connectorErrorCount} error${connectorErrorCount > 1 ? 's' : ''}, ${connectorWarnCount} warning${connectorWarnCount !== 1 ? 's' : ''}`
             : connectorWarnCount > 0 ? `${connectorWarnCount} warning${connectorWarnCount > 1 ? 's' : ''}`
@@ -150,7 +150,7 @@ export default function Dashboard() {
         />
         <StatusCard
           title="DCR Status"
-          value={`${dcr?.healthyCount ?? '—'} / ${dcr?.totalCount ?? '—'}`}
+          value={`${dcr?.healthyCount ?? '-'} / ${dcr?.totalCount ?? '-'}`}
           subtitle={dcrErrors > 0 ? `${dcrErrors} error${dcrErrors > 1 ? 's' : ''}` : 'All receiving data'}
           icon={dcrErrors > 0 ? <AlertTriangle size={24} /> : <CheckCircle size={24} />}
           color={dcrErrors > 0 ? 'yellow' : 'green'}
@@ -163,7 +163,7 @@ export default function Dashboard() {
           <AlertTriangle size={16} />
           <span>
             <strong>{connectorErrorCount} connector{connectorErrorCount > 1 ? 's' : ''} with errors</strong>
-            {' — '}
+            {': '}
             {connectors.connectors
               .filter(c => c.status === 'Error')
               .slice(0, 3)
@@ -180,7 +180,7 @@ export default function Dashboard() {
         {/* ── Left column ── */}
         <div className="dash-col-main">
 
-          {/* Top tables by cost — always visible after Phase 1 */}
+          {/* Top tables by cost: always visible after Phase 1 */}
           {topCostTables.length > 0 && (
             <div className="section">
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
@@ -207,7 +207,7 @@ export default function Dashboard() {
             </div>
           )}
 
-          {/* Top rules by incidents — available as soon as Phase 1 completes (partial data), full data after Phase 2 */}
+          {/* Top rules by incidents: available as soon as Phase 1 completes (partial data), full data after Phase 2 */}
           {analytics && (
             <div className="section">
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
@@ -268,7 +268,7 @@ export default function Dashboard() {
         {/* ── Right column ── */}
         <div className="dash-col-side">
 
-          {/* Connector status — TOP, most operational */}
+          {/* Connector status: TOP, most operational */}
           {connectors && connectors.connectors.length > 0 && (
             <div className="section">
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
@@ -287,7 +287,7 @@ export default function Dashboard() {
                       <span style={{ fontSize: '0.7rem', color: 'var(--warning)', flexShrink: 0 }}>{Math.round(c.gapMinutes / 60)}h gap</span>
                     ) : (
                       <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', flexShrink: 0 }}>
-                        {c.lastLogReceived ? <RelativeTime iso={c.lastLogReceived} /> : '—'}
+                        {c.lastLogReceived ? <RelativeTime iso={c.lastLogReceived} /> : '-'}
                       </span>
                     )}
                   </div>
@@ -306,10 +306,10 @@ export default function Dashboard() {
             <h3>Quick Stats</h3>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
               {[
-                { icon: <ShieldCheck size={14} />, label: 'Rules with incidents',  value: analytics ? (analytics.totalIncidents > 0 ? rulesWithIncidents : '…') : '—', color: rulesWithIncidents > 0 ? 'var(--warning)' : 'var(--healthy)' },
-                { icon: <Activity     size={14} />, label: 'Total incidents (30d)', value: analytics?.totalIncidents ?? '—', color: (analytics?.totalIncidents ?? 0) > 0 ? 'var(--warning)' : 'var(--text-primary)' },
-                { icon: <TrendingUp   size={14} />, label: 'Daily avg ingestion',   value: ingestion ? `${(ingestion.totalVolumeGB / (ingestion.daysAnalyzed || 30)).toFixed(2)} GB` : '—', color: 'var(--text-primary)' },
-                { icon: <Database     size={14} />, label: 'Ingestion tables',      value: ingestion?.tables?.length ?? '—', color: 'var(--text-primary)' },
+                { icon: <ShieldCheck size={14} />, label: 'Rules with incidents',  value: analytics ? (analytics.totalIncidents > 0 ? rulesWithIncidents : '…') : '-', color: rulesWithIncidents > 0 ? 'var(--warning)' : 'var(--healthy)' },
+                { icon: <Activity     size={14} />, label: 'Total incidents (30d)', value: analytics?.totalIncidents ?? '-', color: (analytics?.totalIncidents ?? 0) > 0 ? 'var(--warning)' : 'var(--text-primary)' },
+                { icon: <TrendingUp   size={14} />, label: 'Daily avg ingestion',   value: ingestion ? `${(ingestion.totalVolumeGB / (ingestion.daysAnalyzed || 30)).toFixed(2)} GB` : '-', color: 'var(--text-primary)' },
+                { icon: <Database     size={14} />, label: 'Ingestion tables',      value: ingestion?.tables?.length ?? '-', color: 'var(--text-primary)' },
               ].map(s => (
                 <div key={s.label} style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', fontSize: '0.82rem' }}>
                   <span style={{ color: 'var(--text-muted)', flexShrink: 0 }}>{s.icon}</span>
@@ -354,7 +354,7 @@ export default function Dashboard() {
             </div>
           )}
 
-          {/* Severity breakdown — only when incident data is loaded */}
+          {/* Severity breakdown: only when incident data is loaded */}
           {severityData.length > 0 && analytics && analytics.totalIncidents > 0 && (
             <div className="section">
               <h3>Rule Severity Breakdown</h3>

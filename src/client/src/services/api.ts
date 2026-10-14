@@ -15,7 +15,7 @@ const api = axios.create({
   timeout: 60000,
 });
 
-// Auth interceptor — acquire token silently and attach to every request
+// Auth interceptor: acquire token silently and attach to every request
 api.interceptors.request.use(async (config) => {
   try {
     const accounts = msalInstance.getAllAccounts();

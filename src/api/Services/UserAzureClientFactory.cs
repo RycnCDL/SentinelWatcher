@@ -6,7 +6,7 @@ namespace SentinelWatcher.Api.Services;
 
 /// <summary>
 /// Creates Azure clients using the signed-in user's token via OBO flow.
-/// Registered as Scoped — one instance per HTTP request.
+/// Registered as Scoped: one instance per HTTP request.
 /// </summary>
 public class UserAzureClientFactory
 {

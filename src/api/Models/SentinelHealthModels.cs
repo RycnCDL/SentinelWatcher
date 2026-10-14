@@ -41,10 +41,10 @@ public class SentinelHealthResponse
     public DateTime QueryTime { get; set; }
     public bool HealthMonitoringEnabled { get; set; }
 
-    // Health Score (0–100)
+    // Health Score (0 to 100)
     public int HealthScore { get; set; }
 
-    // KPIs — last 24h
+    // KPIs: last 24h
     public int TotalConnectors { get; set; }
     public int HealthyConnectors { get; set; }
     public int TotalRuleRuns { get; set; }
@@ -53,7 +53,7 @@ public class SentinelHealthResponse
     public int TotalAutomationRuns { get; set; }
     public int FailedAutomationRuns { get; set; }
 
-    // Auto-disabled rules — silent detection loss (critical!)
+    // Auto-disabled rules: silent detection loss (critical!)
     public List<AutoDisabledRule> AutoDisabledRules { get; set; } = new();
 
     // 7-day failure trend per resource type

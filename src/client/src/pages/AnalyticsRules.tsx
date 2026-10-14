@@ -87,7 +87,7 @@ export default function AnalyticsRules() {
       </div>
 
       <div className="section">
-        <h3>Top 20 Rules — Most Incidents</h3>
+        <h3>Top 20 Rules: Most Incidents</h3>
         <div className="chart-container">
           <ResponsiveContainer width="100%" height={500}>
             <BarChart data={topChartData} layout="vertical" margin={{ left: 200 }}>
@@ -146,7 +146,7 @@ export default function AnalyticsRules() {
       </div>
 
       <div className="section">
-        <h3>Top 20 Rules — Least / No Incidents (Enabled)</h3>
+        <h3>Top 20 Rules: Least / No Incidents (Enabled)</h3>
         <table className="data-table">
           <thead>
             <tr>

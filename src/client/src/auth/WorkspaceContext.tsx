@@ -29,7 +29,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
         localStorage.setItem(STORAGE_KEY, data[0].workspaceId);
       }
     } catch (err: unknown) {
-      // If 401, token may not be ready yet — retry once after a short delay
+      // If 401, token may not be ready yet: retry once after a short delay
       if (isAxiosError(err) && err.response?.status === 401 && !retried) {
         setTimeout(() => loadWorkspaces(true), 1000);
         return;

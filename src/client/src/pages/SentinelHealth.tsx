@@ -28,7 +28,7 @@ function ScoreRing({ score }: { score: number }) {
       <svg width="140" height="140" viewBox="0 0 140 140">
         {/* Track */}
         <circle cx="70" cy="70" r={r} fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth="10" />
-        {/* Fill — solid circle when 100%, dashed arc otherwise */}
+        {/* Fill: solid circle when 100%, dashed arc otherwise */}
         {isFull ? (
           <circle
             cx="70" cy="70" r={r}
@@ -104,10 +104,10 @@ function ConnectorRow({ c }: { c: ConnectorCurrentStatus }) {
         </span>
       </td>
       <td style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>
-        {c.lastEvent ? new Date(c.lastEvent).toLocaleString() : '—'}
+        {c.lastEvent ? new Date(c.lastEvent).toLocaleString() : '-'}
       </td>
       <td style={{ color: 'var(--text-secondary)', fontSize: '0.8rem', maxWidth: 260 }}>
-        <span className="truncate" title={c.description ?? ''}>{c.description ?? '—'}</span>
+        <span className="truncate" title={c.description ?? ''}>{c.description ?? '-'}</span>
       </td>
     </tr>
   );
@@ -241,7 +241,7 @@ export default function SentinelHealth() {
           <ShieldOff size={18} />
           <span>
             <strong>{data.autoDisabledRulesCount} analytics rule{data.autoDisabledRulesCount > 1 ? 's' : ''} auto-disabled</strong>
-            {' '}— consecutive failures caused Sentinel to disable them automatically.
+            {'. '}Consecutive failures caused Sentinel to disable them automatically.
           </span>
           <div className="sh-autodisabled-list">
             {data.autoDisabledRules.map((r, i) => (
@@ -324,7 +324,7 @@ export default function SentinelHealth() {
 
         {/* 7-day trend */}
         <div className="section chart-half">
-          <h3>Failure Trend — {days}d</h3>
+          <h3>Failure Trend ({days}d)</h3>
           <ResponsiveContainer width="100%" height={220}>
             <AreaChart data={trendFormatted} margin={{ top: 5, right: 16, left: -10, bottom: 0 }}>
               <defs>
@@ -355,7 +355,7 @@ export default function SentinelHealth() {
 
         {/* Failure distribution donut */}
         <div className="section chart-half">
-          <h3>Failure Distribution — 24h</h3>
+          <h3>Failure Distribution (24h)</h3>
           {failuresByType.length === 0 ? (
             <div style={{ height: 220, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--healthy)', fontSize: '0.9rem', gap: '0.5rem' }}>
               <HeartPulse size={20} /> No failures in the last 24 hours
@@ -423,7 +423,7 @@ export default function SentinelHealth() {
 
       {/* ── Recent Failures ── */}
       <div className="section">
-        <h3>Recent Failures — 24h</h3>
+        <h3>Recent Failures (24h)</h3>
         {data.recentFailures.length === 0 ? (
           <div style={{ textAlign: 'center', padding: '2rem', color: 'var(--healthy)' }}>
             ✓ No failures in the last 24 hours

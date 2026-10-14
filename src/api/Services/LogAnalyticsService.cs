@@ -140,7 +140,7 @@ public class LogAnalyticsService
                 }
             }
 
-            // Check important tables not found in Usage — single union query instead of N individual queries
+            // Check important tables not found in Usage: single union query instead of N individual queries
             var foundTables      = new HashSet<string>(response.Tables.Select(t => t.TableName));
             var importantMissing = ImportantTables.Where(t => !foundTables.Contains(t)).ToArray();
 
@@ -232,7 +232,7 @@ public class LogAnalyticsService
 
         try
         {
-            // Single union query with isfuzzy=true — silently skips tables that don't exist.
+            // Single union query with isfuzzy=true: silently skips tables that don't exist.
             // The built-in Type column contains the source table name in Log Analytics.
             // This replaces 36 individual queries with 1, which is significantly faster.
             var tableList = string.Join(", ", ImportantTables);
@@ -246,7 +246,7 @@ public class LogAnalyticsService
             var queryResult = await logsClient.QueryWorkspaceAsync(
                 workspace.WorkspaceId, kql, QueryTimeRange.All);
 
-            // Accept both Success and PartialFailure — isfuzzy=true raises PartialFailure
+            // Accept both Success and PartialFailure: isfuzzy=true raises PartialFailure
             // when some tables don't exist in the workspace, but still returns valid rows.
             var status = queryResult.Value.Status;
             if (status == LogsQueryResultStatus.Success || status == LogsQueryResultStatus.PartialFailure)

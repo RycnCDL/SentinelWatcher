@@ -219,8 +219,8 @@ export default function Ingestion() {
           <div className="section">
             <h3>
               {selectedConnector === 'all'
-                ? 'All Tables — Detailed Breakdown'
-                : `${connectors?.connectors.find((c) => c.connectorId === selectedConnector)?.connectorName} — Tables`}
+                ? 'All Tables: Detailed Breakdown'
+                : `${connectors?.connectors.find((c) => c.connectorId === selectedConnector)?.connectorName}: Tables`}
             </h3>
             <table className="data-table">
               <thead>

@@ -1171,7 +1171,7 @@ nav {
   background: rgba(255, 77, 77, 0.1);
 }
 
-/* ===== Sentinel Health – SOC Dashboard ===== */
+/* ===== Sentinel Health: SOC Dashboard ===== */
 
 /* Hero row: score ring + KPI grid side by side */
 .sh-hero-row {
@@ -1205,7 +1205,7 @@ nav {
   text-align: center;
 }
 
-/* KPI grid — always 4 columns (cards shrink naturally) */
+/* KPI grid: always 4 columns (cards shrink naturally) */
 .sh-kpi-grid {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
