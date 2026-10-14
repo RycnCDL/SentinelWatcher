@@ -31,6 +31,7 @@ public class WorkspaceRegistryTests
     [InlineData("/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg/providers/Microsoft.Storage/storageAccounts/sa")]
     [InlineData("/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg/providers/Microsoft.OperationalInsights/workspaces/law?x=1")]
     [InlineData("/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg/providers/Microsoft.OperationalInsights/workspaces/law#frag")]
+    [InlineData("/subscriptions/<subscription-id>/resourceGroups/<resource-group>/providers/Microsoft.OperationalInsights/workspaces/<workspace-name>")]
     public void InvalidConfiguration_FailsAtStartup(string workspace)
     {
         Assert.Throws<InvalidOperationException>(() => Create(workspace));

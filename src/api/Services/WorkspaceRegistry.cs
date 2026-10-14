@@ -21,7 +21,8 @@ public sealed class WorkspaceRegistry
     public const int MaxResourceIdLength = 512;
 
     private const string WorkspaceResourceType = "Microsoft.OperationalInsights/workspaces";
-    private static readonly char[] ForbiddenChars = { '?', '#', '%', '\\', ' ' };
+    // Never valid in Azure resource IDs. "<" and ">" also catch unedited sample placeholders.
+    private static readonly char[] ForbiddenChars = { '?', '#', '%', '\\', ' ', '<', '>' };
 
     private readonly Dictionary<string, WorkspaceContext> _byResourceId = new(StringComparer.OrdinalIgnoreCase);
 
