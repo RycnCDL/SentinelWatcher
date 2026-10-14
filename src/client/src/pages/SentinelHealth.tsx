@@ -155,7 +155,7 @@ export default function SentinelHealth() {
   const [connectorFilter, setConnectorFilter] = useState<'all' | 'issues'>('all');
   const chart = useChartTheme();
 
-  const requestKey = selectedWorkspace ? `${selectedWorkspace.workspaceId}|${days}` : null;
+  const requestKey = selectedWorkspace ? `${selectedWorkspace.resourceId}|${days}` : null;
   const loading = requestKey === null || settledKey !== requestKey;
 
   useEffect(() => {

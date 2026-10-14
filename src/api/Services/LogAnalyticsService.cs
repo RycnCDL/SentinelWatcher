@@ -45,8 +45,7 @@ public class LogAnalyticsService
                     by tostring(RuleId)
             ";
 
-            var result = await logsClient.QueryWorkspaceAsync(
-                workspace.WorkspaceId, kql, LogsQueryTimeRange.All);
+            var result = await logsClient.QueryResourceAsync(workspace.ResourceIdentifier, kql, LogsQueryTimeRange.All);
 
             var incidentMap = new Dictionary<string, (int Count, DateTime? Last)>();
             if (result.Value.Status == LogsQueryResultStatus.Success)
@@ -118,8 +117,7 @@ public class LogAnalyticsService
                 | sort by TotalVolumeMB desc
             ";
 
-            var result = await logsClient.QueryWorkspaceAsync(
-                workspace.WorkspaceId, kql, LogsQueryTimeRange.All);
+            var result = await logsClient.QueryResourceAsync(workspace.ResourceIdentifier, kql, LogsQueryTimeRange.All);
 
             if (result.Value.Status == LogsQueryResultStatus.Success)
             {
@@ -157,8 +155,7 @@ public class LogAnalyticsService
                         | where RecordCount > 0
                     ";
 
-                    var missingResult = await logsClient.QueryWorkspaceAsync(
-                        workspace.WorkspaceId, missingKql, LogsQueryTimeRange.All);
+                    var missingResult = await logsClient.QueryResourceAsync(workspace.ResourceIdentifier, missingKql, LogsQueryTimeRange.All);
 
                     var missingStatus = missingResult.Value.Status;
                     if (missingStatus == LogsQueryResultStatus.Success || missingStatus == LogsQueryResultStatus.PartialFailure)
@@ -243,8 +240,7 @@ public class LogAnalyticsService
                 | where isnotnull(LastLog)
             ";
 
-            var queryResult = await logsClient.QueryWorkspaceAsync(
-                workspace.WorkspaceId, kql, LogsQueryTimeRange.All);
+            var queryResult = await logsClient.QueryResourceAsync(workspace.ResourceIdentifier, kql, LogsQueryTimeRange.All);
 
             // Accept both Success and PartialFailure: isfuzzy=true raises PartialFailure
             // when some tables don't exist in the workspace, but still returns valid rows.
@@ -291,7 +287,7 @@ public class LogAnalyticsService
             try
             {
                 var kql = $"{table} | where TimeGenerated > ago(24h) | summarize LastLog = max(TimeGenerated)";
-                var qr  = await logsClient.QueryWorkspaceAsync(workspace.WorkspaceId, kql, LogsQueryTimeRange.All);
+                var qr  = await logsClient.QueryResourceAsync(workspace.ResourceIdentifier, kql, LogsQueryTimeRange.All);
 
                 if (qr.Value.Status == LogsQueryResultStatus.Success && qr.Value.Table.Rows.Count > 0)
                 {
@@ -318,7 +314,7 @@ public class LogAnalyticsService
         try
         {
             var probeKql = "_SentinelHealth() | take 1 | project TimeGenerated";
-            var probe = await logsClient.QueryWorkspaceAsync(workspace.WorkspaceId, probeKql, LogsQueryTimeRange.All);
+            var probe = await logsClient.QueryResourceAsync(workspace.ResourceIdentifier, probeKql, LogsQueryTimeRange.All);
             if (probe.Value.Status != LogsQueryResultStatus.Success || probe.Value.Table.Rows.Count == 0)
             {
                 response.HealthMonitoringEnabled = false;
@@ -384,7 +380,7 @@ public class LogAnalyticsService
                     Failure = countif(Status != 'Success')
                     by SentinelResourceType
             ";
-            var qr = await client.QueryWorkspaceAsync(ws.WorkspaceId, kql, LogsQueryTimeRange.All);
+            var qr = await client.QueryResourceAsync(ws.ResourceIdentifier, kql, LogsQueryTimeRange.All);
             if (qr.Value.Status == LogsQueryResultStatus.Success)
             {
                 foreach (var row in qr.Value.Table.Rows)
@@ -405,14 +401,15 @@ public class LogAnalyticsService
         var points = new Dictionary<string, HealthTrendPoint>();
         try
         {
-            var kql = $@"
+            // The window is passed as the query time range parameter, not interpolated into the KQL.
+            const string kql = @"
                 _SentinelHealth()
-                | where TimeGenerated > ago({days}d)
                 | where Status != 'Success'
                 | summarize Failures = count() by SentinelResourceType, Day = bin(TimeGenerated, 1d)
                 | order by Day asc
             ";
-            var qr = await client.QueryWorkspaceAsync(ws.WorkspaceId, kql, LogsQueryTimeRange.All);
+            var qr = await client.QueryResourceAsync(
+                ws.ResourceIdentifier, kql, new LogsQueryTimeRange(TimeSpan.FromDays(days)));
             if (qr.Value.Status == LogsQueryResultStatus.Success)
             {
                 foreach (var row in qr.Value.Table.Rows)
@@ -452,7 +449,7 @@ public class LogAnalyticsService
                 | project SentinelResourceName, SentinelResourceKind, Status, TimeGenerated, Description
                 | order by Status asc, TimeGenerated desc
             ";
-            var qr = await client.QueryWorkspaceAsync(ws.WorkspaceId, kql, LogsQueryTimeRange.All);
+            var qr = await client.QueryResourceAsync(ws.ResourceIdentifier, kql, LogsQueryTimeRange.All);
             if (qr.Value.Status == LogsQueryResultStatus.Success)
             {
                 foreach (var row in qr.Value.Table.Rows)
@@ -485,7 +482,7 @@ public class LogAnalyticsService
                 | summarize LastSeen = max(TimeGenerated) by SentinelResourceName, SentinelResourceId, SentinelResourceKind
                 | order by LastSeen desc
             ";
-            var qr = await client.QueryWorkspaceAsync(ws.WorkspaceId, kql, LogsQueryTimeRange.All);
+            var qr = await client.QueryResourceAsync(ws.ResourceIdentifier, kql, LogsQueryTimeRange.All);
             if (qr.Value.Status == LogsQueryResultStatus.Success)
             {
                 foreach (var row in qr.Value.Table.Rows)
@@ -518,7 +515,7 @@ public class LogAnalyticsService
                 | order by TimeGenerated desc
                 | take 50
             ";
-            var qr = await client.QueryWorkspaceAsync(ws.WorkspaceId, kql, LogsQueryTimeRange.All);
+            var qr = await client.QueryResourceAsync(ws.ResourceIdentifier, kql, LogsQueryTimeRange.All);
             if (qr.Value.Status == LogsQueryResultStatus.Success)
             {
                 foreach (var row in qr.Value.Table.Rows)

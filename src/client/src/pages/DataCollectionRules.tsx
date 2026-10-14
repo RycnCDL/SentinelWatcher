@@ -29,7 +29,7 @@ export default function DataCollectionRules() {
   const [data, setData] = useState<DcrResponse | null>(null);
   const [settledKey, setSettledKey] = useState<string | null>(null);
   const [expanded, setExpanded] = useState<string | null>(null);
-  const loading = !selectedWorkspace || settledKey !== selectedWorkspace.workspaceId;
+  const loading = !selectedWorkspace || settledKey !== selectedWorkspace.resourceId;
 
   useEffect(() => {
     if (!selectedWorkspace) return;
@@ -39,7 +39,7 @@ export default function DataCollectionRules() {
         const result = await getDcr(ws);
         setData(result);
       } finally {
-        setSettledKey(ws.workspaceId);
+        setSettledKey(ws.resourceId);
       }
     }
     fetchData();

@@ -1,12 +1,11 @@
 import { createContext, useContext } from 'react';
 
+// A workspace from the server-side allow-list. resourceId identifies it in API calls.
 export interface WorkspaceInfo {
-  subscriptionId: string;
-  subscriptionName: string;
-  resourceGroup: string;
+  resourceId: string;
   workspaceName: string;
-  workspaceId: string;
-  location: string;
+  subscriptionId: string;
+  resourceGroup: string;
   sentinelEnabled: boolean;
 }
 

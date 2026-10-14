@@ -52,7 +52,7 @@ export default function Ingestion() {
   const [connectors, setConnectors] = useState<DataConnectorsResponse | null>(null);
   const [settledKey, setSettledKey] = useState<string | null>(null);
   const [selectedConnector, setSelectedConnector] = useState<string>('all');
-  const loading = !selectedWorkspace || settledKey !== selectedWorkspace.workspaceId;
+  const loading = !selectedWorkspace || settledKey !== selectedWorkspace.resourceId;
 
   useEffect(() => {
     if (!selectedWorkspace) return;
@@ -63,7 +63,7 @@ export default function Ingestion() {
         if (ing.status === 'fulfilled') setData(ing.value);
         if (conn.status === 'fulfilled') setConnectors(conn.value);
       } finally {
-        setSettledKey(ws.workspaceId);
+        setSettledKey(ws.resourceId);
       }
     }
     fetchData();

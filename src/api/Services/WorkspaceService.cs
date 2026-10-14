@@ -4,24 +4,27 @@ namespace SentinelWatcher.Api.Services;
 
 public class WorkspaceService
 {
-    private readonly ResourceGraphService _resourceGraph;
-    private readonly ILogger<WorkspaceService> _logger;
+    private readonly WorkspaceRegistry _registry;
+    private readonly IWorkspaceStatusProvider _statusProvider;
 
-    public WorkspaceService(
-        ResourceGraphService resourceGraph,
-        ILogger<WorkspaceService> logger)
+    public WorkspaceService(WorkspaceRegistry registry, IWorkspaceStatusProvider statusProvider)
     {
-        _resourceGraph = resourceGraph;
-        _logger = logger;
+        _registry = registry;
+        _statusProvider = statusProvider;
     }
 
-    /// <summary>
-    /// Discovers all Log Analytics workspaces with Sentinel enabled that the user can access.
-    /// Uses Azure Resource Graph for efficient cross-subscription discovery in a single round-trip.
-    /// </summary>
-    public async Task<List<WorkspaceInfo>> GetSentinelWorkspacesAsync()
+    /// <summary>Returns the configured workspaces with their Sentinel status.</summary>
+    public async Task<List<WorkspaceInfo>> GetWorkspacesAsync(CancellationToken cancellationToken)
     {
-        _logger.LogInformation("Discovering Sentinel workspaces via Azure Resource Graph");
-        return await _resourceGraph.GetSentinelWorkspacesAsync();
+        var tasks = _registry.All.Select(async ws => new WorkspaceInfo
+        {
+            ResourceId = ws.ResourceId,
+            WorkspaceName = ws.WorkspaceName,
+            SubscriptionId = ws.SubscriptionId,
+            ResourceGroup = ws.ResourceGroup,
+            SentinelEnabled = await _statusProvider.IsSentinelEnabledAsync(ws, cancellationToken),
+        });
+
+        return (await Task.WhenAll(tasks)).ToList();
     }
 }

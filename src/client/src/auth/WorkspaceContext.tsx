@@ -30,13 +30,13 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
 
         // Restore last selected workspace from localStorage
         const savedId = localStorage.getItem(STORAGE_KEY);
-        const saved = data.find((ws: WorkspaceInfo) => ws.workspaceId === savedId);
+        const saved = data.find((ws: WorkspaceInfo) => ws.resourceId === savedId);
 
         if (saved) {
           setSelectedWorkspace(saved);
         } else if (data.length > 0) {
           setSelectedWorkspace(data[0]);
-          localStorage.setItem(STORAGE_KEY, data[0].workspaceId);
+          localStorage.setItem(STORAGE_KEY, data[0].resourceId);
         }
       })
       .catch((err: unknown) => {
@@ -57,7 +57,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
 
   const switchWorkspace = useCallback((workspace: WorkspaceInfo) => {
     setSelectedWorkspace(workspace);
-    localStorage.setItem(STORAGE_KEY, workspace.workspaceId);
+    localStorage.setItem(STORAGE_KEY, workspace.resourceId);
   }, []);
 
   return (

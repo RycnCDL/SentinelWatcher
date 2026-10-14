@@ -45,7 +45,7 @@ export default function Dashboard() {
   const [connectors, setConnectors] = useState<DataConnectorsResponse | null>(null);
   const [dcr, setDcr]               = useState<DcrResponse | null>(null);
   const [settledKey, setSettledKey] = useState<string | null>(null);
-  const loading = !selectedWorkspace || settledKey !== selectedWorkspace.workspaceId;
+  const loading = !selectedWorkspace || settledKey !== selectedWorkspace.resourceId;
   const chart = useChartTheme();
 
   useEffect(() => {
@@ -62,7 +62,7 @@ export default function Dashboard() {
         if (c.status === 'fulfilled') setConnectors(c.value);
         if (d.status === 'fulfilled') setDcr(d.value);
       } finally {
-        setSettledKey(ws.workspaceId);
+        setSettledKey(ws.resourceId);
       }
     }
     fetchAll();

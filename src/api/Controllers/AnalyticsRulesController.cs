@@ -1,23 +1,22 @@
-using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using SentinelWatcher.Api.Models;
 using SentinelWatcher.Api.Services;
 
 namespace SentinelWatcher.Api.Controllers;
 
-[ApiController]
 [Route("api/[controller]")]
-[Authorize]
-public class AnalyticsRulesController : ControllerBase
+public class AnalyticsRulesController : WorkspaceControllerBase
 {
     private readonly WorkspaceCacheManager _cacheManager;
     private readonly SentinelService _sentinelService;
     private readonly LogAnalyticsService _logAnalyticsService;
 
     public AnalyticsRulesController(
+        WorkspaceRegistry registry,
         WorkspaceCacheManager cacheManager,
         SentinelService sentinelService,
         LogAnalyticsService logAnalyticsService)
+        : base(registry)
     {
         _cacheManager = cacheManager;
         _sentinelService = sentinelService;
@@ -25,26 +24,14 @@ public class AnalyticsRulesController : ControllerBase
     }
 
     [HttpGet]
-    public async Task<ActionResult<AnalyticsRulesResponse>> Get(
-        [FromQuery] string subscriptionId,
-        [FromQuery] string resourceGroup,
-        [FromQuery] string workspaceName,
-        [FromQuery] string workspaceId)
+    public async Task<ActionResult<AnalyticsRulesResponse>> Get([FromQuery] string? workspace)
     {
-        var workspace = new WorkspaceContext
-        {
-            SubscriptionId = subscriptionId,
-            ResourceGroup = resourceGroup,
-            WorkspaceName = workspaceName,
-            WorkspaceId = workspaceId
-        };
+        var ws = ResolveWorkspace(workspace, out var error);
+        if (ws is null) return error!;
 
-        if (!workspace.IsValid)
-            return BadRequest(new { message = "Missing workspace parameters" });
+        await _cacheManager.EnsureDataAvailableAsync(ws, _sentinelService, _logAnalyticsService);
 
-        await _cacheManager.EnsureDataAvailableAsync(workspaceId, workspace, _sentinelService, _logAnalyticsService);
-
-        var entry = _cacheManager.GetOrCreateEntry(workspaceId);
+        var entry = _cacheManager.GetOrCreateEntry(ws);
         if (entry.AnalyticsRules == null)
             return StatusCode(503, new { message = "Data is still loading. Please try again shortly." });
 
@@ -52,24 +39,12 @@ public class AnalyticsRulesController : ControllerBase
     }
 
     [HttpPost("refresh")]
-    public async Task<IActionResult> Refresh(
-        [FromQuery] string subscriptionId,
-        [FromQuery] string resourceGroup,
-        [FromQuery] string workspaceName,
-        [FromQuery] string workspaceId)
+    public async Task<IActionResult> Refresh([FromQuery] string? workspace)
     {
-        var workspace = new WorkspaceContext
-        {
-            SubscriptionId = subscriptionId,
-            ResourceGroup = resourceGroup,
-            WorkspaceName = workspaceName,
-            WorkspaceId = workspaceId
-        };
+        var ws = ResolveWorkspace(workspace, out var error);
+        if (ws is null) return error!;
 
-        if (!workspace.IsValid)
-            return BadRequest(new { message = "Missing workspace parameters" });
-
-        await _cacheManager.RefreshCacheAsync(workspaceId, workspace, _sentinelService, _logAnalyticsService);
+        await _cacheManager.RefreshCacheAsync(ws, _sentinelService, _logAnalyticsService);
         return Ok(new { message = "Cache refreshed" });
     }
 }

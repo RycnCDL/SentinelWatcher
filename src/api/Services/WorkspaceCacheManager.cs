@@ -31,9 +31,9 @@ public class WorkspaceCacheManager
         _evictMinutes = 30;
     }
 
-    public WorkspaceCacheEntry GetOrCreateEntry(string workspaceId)
+    public WorkspaceCacheEntry GetOrCreateEntry(WorkspaceContext workspace)
     {
-        var entry = _caches.GetOrAdd(workspaceId, _ => new WorkspaceCacheEntry());
+        var entry = _caches.GetOrAdd(workspace.Key, _ => new WorkspaceCacheEntry());
         entry.LastAccessed = DateTime.UtcNow;
         return entry;
     }
@@ -60,26 +60,26 @@ public class WorkspaceCacheManager
     /// - No data at all: triggers refresh and waits up to 90 seconds (first load).
     /// </summary>
     public async Task EnsureDataAvailableAsync(
-        string workspaceId,
         WorkspaceContext workspace,
         SentinelService sentinelService,
         LogAnalyticsService logAnalyticsService)
     {
+        var workspaceId = workspace.Key;
         if (IsCacheFresh(workspaceId)) return;
 
-        var entry = GetOrCreateEntry(workspaceId);
+        var entry = GetOrCreateEntry(workspace);
 
         if (HasAnyData(workspaceId))
         {
             // Stale but usable: return current data and refresh in background
             if (!entry.IsRefreshing)
-                _ = Task.Run(() => RefreshCacheAsync(workspaceId, workspace, sentinelService, logAnalyticsService));
+                _ = Task.Run(() => RefreshCacheAsync(workspace, sentinelService, logAnalyticsService));
             return;
         }
 
         // First load: ensure refresh is running, then wait for data
         if (!entry.IsRefreshing)
-            _ = Task.Run(() => RefreshCacheAsync(workspaceId, workspace, sentinelService, logAnalyticsService));
+            _ = Task.Run(() => RefreshCacheAsync(workspace, sentinelService, logAnalyticsService));
 
         // Poll until data arrives or timeout (90s)
         var deadline = DateTime.UtcNow.AddSeconds(90);
@@ -88,12 +88,12 @@ public class WorkspaceCacheManager
     }
 
     public async Task RefreshCacheAsync(
-        string workspaceId,
         WorkspaceContext workspace,
         SentinelService sentinelService,
         LogAnalyticsService logAnalyticsService)
     {
-        var entry = GetOrCreateEntry(workspaceId);
+        var workspaceId = workspace.Key;
+        var entry = GetOrCreateEntry(workspace);
 
         if (!await entry.RefreshLock.WaitAsync(TimeSpan.FromSeconds(2)))
         {

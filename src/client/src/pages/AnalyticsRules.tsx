@@ -29,7 +29,7 @@ export default function AnalyticsRules() {
   const [data, setData] = useState<AnalyticsRulesResponse | null>(null);
   const [settledKey, setSettledKey] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
-  const loading = !selectedWorkspace || settledKey !== selectedWorkspace.workspaceId;
+  const loading = !selectedWorkspace || settledKey !== selectedWorkspace.resourceId;
 
   const fetchData = useCallback(async () => {
     if (!selectedWorkspace) return;
@@ -37,7 +37,7 @@ export default function AnalyticsRules() {
       const result = await getAnalyticsRules(selectedWorkspace);
       setData(result);
     } finally {
-      setSettledKey(selectedWorkspace.workspaceId);
+      setSettledKey(selectedWorkspace.resourceId);
     }
   }, [selectedWorkspace]);
 

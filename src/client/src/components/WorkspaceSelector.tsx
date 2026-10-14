@@ -22,7 +22,7 @@ export default function WorkspaceSelector() {
   }
 
   if (workspaces.length === 0) {
-    return <div className="workspace-selector workspace-selector--empty">No workspaces found</div>;
+    return <div className="workspace-selector workspace-selector--empty">No workspaces configured</div>;
   }
 
   return (
@@ -41,13 +41,13 @@ export default function WorkspaceSelector() {
         <div className="workspace-selector__dropdown">
           {workspaces.map((ws) => (
             <button
-              key={ws.workspaceId}
-              className={`workspace-selector__option ${ws.workspaceId === selectedWorkspace?.workspaceId ? 'active' : ''}`}
+              key={ws.resourceId}
+              className={`workspace-selector__option ${ws.resourceId === selectedWorkspace?.resourceId ? 'active' : ''}`}
               onClick={() => { switchWorkspace(ws); setOpen(false); }}
             >
               <span className="workspace-selector__option-name">{ws.workspaceName}</span>
               <span className="workspace-selector__option-sub">
-                {ws.subscriptionName} / {ws.resourceGroup}
+                {ws.resourceGroup}
               </span>
             </button>
           ))}

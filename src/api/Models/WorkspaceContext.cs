@@ -1,30 +1,29 @@
+using Azure.Core;
+
 namespace SentinelWatcher.Api.Models;
 
-public class WorkspaceContext
+/// <summary>
+/// A workspace from the configured allow-list. Every value comes from configuration,
+/// never from the request, so it is safe to use when building ARM URLs.
+/// </summary>
+public sealed class WorkspaceContext
 {
-    public string SubscriptionId { get; set; } = string.Empty;
-    public string ResourceGroup { get; set; } = string.Empty;
-    public string WorkspaceName { get; set; } = string.Empty;
-    public string WorkspaceId { get; set; } = string.Empty;
+    public required string ResourceId { get; init; }
+    public required string SubscriptionId { get; init; }
+    public required string ResourceGroup { get; init; }
+    public required string WorkspaceName { get; init; }
 
-    public bool IsValid =>
-        !string.IsNullOrWhiteSpace(SubscriptionId) &&
-        !string.IsNullOrWhiteSpace(ResourceGroup) &&
-        !string.IsNullOrWhiteSpace(WorkspaceName) &&
-        !string.IsNullOrWhiteSpace(WorkspaceId);
+    public ResourceIdentifier ResourceIdentifier => new(ResourceId);
 
-    /// <summary>ARM resource ID for the Log Analytics workspace.</summary>
-    public string ResourceId =>
-        $"/subscriptions/{SubscriptionId}/resourceGroups/{ResourceGroup}/providers/Microsoft.OperationalInsights/workspaces/{WorkspaceName}";
+    /// <summary>Case-insensitive key for lookups and the cache.</summary>
+    public string Key => ResourceId.ToLowerInvariant();
 }
 
 public class WorkspaceInfo
 {
-    public string SubscriptionId { get; set; } = string.Empty;
-    public string SubscriptionName { get; set; } = string.Empty;
-    public string ResourceGroup { get; set; } = string.Empty;
+    public string ResourceId { get; set; } = string.Empty;
     public string WorkspaceName { get; set; } = string.Empty;
-    public string WorkspaceId { get; set; } = string.Empty;
-    public string Location { get; set; } = string.Empty;
+    public string SubscriptionId { get; set; } = string.Empty;
+    public string ResourceGroup { get; set; } = string.Empty;
     public bool SentinelEnabled { get; set; }
 }

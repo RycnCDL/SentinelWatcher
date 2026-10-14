@@ -17,10 +17,11 @@ public class WorkspacesController : ControllerBase
         _workspaceService = workspaceService;
     }
 
+    /// <summary>Lists the workspaces on the configured allow-list.</summary>
     [HttpGet]
-    public async Task<ActionResult<List<WorkspaceInfo>>> Get()
+    public async Task<ActionResult<List<WorkspaceInfo>>> Get(CancellationToken cancellationToken)
     {
-        var workspaces = await _workspaceService.GetSentinelWorkspacesAsync();
+        var workspaces = await _workspaceService.GetWorkspacesAsync(cancellationToken);
         return Ok(workspaces);
     }
 }

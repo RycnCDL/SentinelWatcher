@@ -33,8 +33,9 @@ api.interceptors.request.use(async (config) => {
   return config;
 });
 
+// The API resolves the workspace from its allow-list by resource ID.
 function wsParams(ws: WorkspaceInfo): string {
-  return `subscriptionId=${encodeURIComponent(ws.subscriptionId)}&resourceGroup=${encodeURIComponent(ws.resourceGroup)}&workspaceName=${encodeURIComponent(ws.workspaceName)}&workspaceId=${encodeURIComponent(ws.workspaceId)}`;
+  return `workspace=${encodeURIComponent(ws.resourceId)}`;
 }
 
 // ---- Workspace-independent endpoints ----

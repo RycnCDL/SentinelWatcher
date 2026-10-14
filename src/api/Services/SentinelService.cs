@@ -1,4 +1,3 @@
-using System.Net.Http.Headers;
 using System.Text.Json;
 using Microsoft.Extensions.Options;
 using SentinelWatcher.Api.Models;
@@ -7,12 +6,10 @@ namespace SentinelWatcher.Api.Services;
 
 public class SentinelService
 {
-    private readonly HttpClient _httpClient;
-    private readonly UserAzureClientFactory _clientFactory;
+    private readonly ArmRestClient _arm;
     private readonly CacheSettingsConfig _cacheConfig;
     private readonly ILogger<SentinelService> _logger;
 
-    private const string ArmBaseUrl = "https://management.azure.com";
     private const string ApiVersion = "2024-03-01";
 
     // Comprehensive table-to-connector mapping for detecting data sources from actual log flow.
@@ -112,52 +109,23 @@ public class SentinelService
         { "MicrosoftPurviewInformationProtection", ("Microsoft Purview", "MicrosoftPurview") },
     };
 
-    private readonly ResourceGraphService _resourceGraph;
-
     public SentinelService(
-        HttpClient httpClient,
-        UserAzureClientFactory clientFactory,
-        ResourceGraphService resourceGraph,
+        ArmRestClient arm,
         IOptions<CacheSettingsConfig> cacheConfig,
         ILogger<SentinelService> logger)
     {
-        _httpClient = httpClient;
-        _clientFactory = clientFactory;
-        _resourceGraph = resourceGraph;
+        _arm = arm;
         _cacheConfig = cacheConfig.Value;
         _logger = logger;
     }
 
-    private static string GetWorkspacePath(WorkspaceContext workspace)
-    {
-        return $"/subscriptions/{workspace.SubscriptionId}/resourceGroups/{workspace.ResourceGroup}" +
-               $"/providers/Microsoft.OperationalInsights/workspaces/{workspace.WorkspaceName}";
-    }
-
     public async Task<List<(string Id, string Name, string Severity, bool Enabled)>> GetAnalyticsRulesAsync(WorkspaceContext workspace)
-    {
-        // Try Azure Resource Graph first: single round-trip vs paginated ARM REST calls.
-        var rules = await _resourceGraph.GetAnalyticsRulesAsync(workspace);
-        if (rules.Count > 0)
-        {
-            _logger.LogInformation("Analytics rules loaded via ARG ({Count} rules)", rules.Count);
-            return rules;
-        }
-
-        // Fallback to direct ARM REST API (e.g. if ARG hasn't indexed the resources yet).
-        _logger.LogWarning("ARG returned 0 rules for {Ws}, falling back to ARM REST API", workspace.WorkspaceName);
-        return await GetAnalyticsRulesFromArmAsync(workspace);
-    }
-
-    private async Task<List<(string Id, string Name, string Severity, bool Enabled)>> GetAnalyticsRulesFromArmAsync(WorkspaceContext workspace)
     {
         var rules = new List<(string Id, string Name, string Severity, bool Enabled)>();
         try
         {
-            var token = await _clientFactory.GetArmAccessTokenAsync();
-            var url = $"{ArmBaseUrl}{GetWorkspacePath(workspace)}/providers/Microsoft.SecurityInsights/alertRules?api-version={ApiVersion}";
-
-            var allItems = await GetAllPagesAsync(url, token);
+            var allItems = await _arm.GetAllPagesAsync(
+                $"{workspace.ResourceId}/providers/Microsoft.SecurityInsights/alertRules", ApiVersion);
 
             foreach (var item in allItems)
             {
@@ -173,7 +141,7 @@ public class SentinelService
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "ARM fallback also failed for analytics rules");
+            _logger.LogError(ex, "Failed to list analytics rules for workspace {Ws}", workspace.WorkspaceName);
         }
         return rules;
     }
@@ -223,9 +191,8 @@ public class SentinelService
             // Secondary: Also try ARM API for any additional traditional connectors
             try
             {
-                var token = await _clientFactory.GetArmAccessTokenAsync();
-                var url = $"{ArmBaseUrl}{GetWorkspacePath(workspace)}/providers/Microsoft.SecurityInsights/dataConnectors?api-version={ApiVersion}";
-                var allItems = await GetAllPagesAsync(url, token);
+                var allItems = await _arm.GetAllPagesAsync(
+                    $"{workspace.ResourceId}/providers/Microsoft.SecurityInsights/dataConnectors", ApiVersion);
 
                 _logger.LogInformation("ARM API returned {Count} traditional connectors", allItems.Count);
 
@@ -319,36 +286,6 @@ public class SentinelService
         }
 
         return response;
-    }
-
-    private async Task<List<JsonElement>> GetAllPagesAsync(string url, string token)
-    {
-        var items = new List<JsonElement>();
-        var currentUrl = url;
-
-        while (!string.IsNullOrEmpty(currentUrl))
-        {
-            var request = new HttpRequestMessage(HttpMethod.Get, currentUrl);
-            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
-
-            var httpResponse = await _httpClient.SendAsync(request);
-            httpResponse.EnsureSuccessStatusCode();
-
-            var json = await httpResponse.Content.ReadAsStringAsync();
-            using var doc = JsonDocument.Parse(json);
-
-            if (doc.RootElement.TryGetProperty("value", out var values))
-            {
-                foreach (var item in values.EnumerateArray())
-                    items.Add(item.Clone());
-            }
-
-            currentUrl = doc.RootElement.TryGetProperty("nextLink", out var nextLink)
-                ? nextLink.GetString()
-                : null;
-        }
-
-        return items;
     }
 
     private static List<string> MapConnectorKindToTables(string kind)

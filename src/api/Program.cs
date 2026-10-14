@@ -8,6 +8,11 @@ var builder = WebApplication.CreateBuilder(args);
 // Configuration
 builder.Services.Configure<CacheSettingsConfig>(
     builder.Configuration.GetSection("CacheSettings"));
+builder.Services.Configure<SentinelOptions>(
+    builder.Configuration.GetSection(SentinelOptions.SectionName));
+
+// Workspace allow-list (Sentinel:Workspaces): the only workspaces the app reads.
+builder.Services.AddSingleton<WorkspaceRegistry>();
 
 // Azure AD authentication with OBO flow
 builder.Services.AddMicrosoftIdentityWebApiAuthentication(builder.Configuration)
@@ -16,12 +21,9 @@ builder.Services.AddMicrosoftIdentityWebApiAuthentication(builder.Configuration)
 
 // Azure client factory (creates per-request clients using user's OBO token)
 builder.Services.AddScoped<UserAzureClientFactory>();
+builder.Services.AddHttpClient<ArmRestClient>();
 
-// Resource Graph: single ARG round-trip replaces N+1 ARM REST calls for config data
-builder.Services.AddHttpClient<ResourceGraphService>();
-
-// Services (HttpClient-typed registrations handle their own HttpClient)
-builder.Services.AddHttpClient<SentinelService>();
+builder.Services.AddScoped<IWorkspaceStatusProvider, SentinelStatusProvider>();
 builder.Services.AddScoped<SentinelService>();
 builder.Services.AddScoped<LogAnalyticsService>();
 builder.Services.AddScoped<DataCollectionRuleService>();
@@ -34,6 +36,9 @@ builder.Services.AddControllers();
 builder.Services.AddOpenApi();
 
 var app = builder.Build();
+
+// Validate the workspace allow-list at startup so configuration errors fail fast.
+app.Services.GetRequiredService<WorkspaceRegistry>();
 
 if (app.Environment.IsDevelopment())
 {
@@ -57,3 +62,6 @@ app.MapFallback("/api/{**path}", () => Results.NotFound());
 app.MapFallbackToFile("index.html");
 
 app.Run();
+
+// Exposed for integration tests (WebApplicationFactory<Program>).
+public partial class Program;

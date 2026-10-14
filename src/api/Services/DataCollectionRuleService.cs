@@ -5,24 +5,33 @@ namespace SentinelWatcher.Api.Services;
 
 public class DataCollectionRuleService
 {
-    private readonly ResourceGraphService _resourceGraph;
+    private const string ApiVersion = "2023-03-11";
+
+    private readonly ArmRestClient _arm;
     private readonly ILogger<DataCollectionRuleService> _logger;
 
     public DataCollectionRuleService(
-        ResourceGraphService resourceGraph,
+        ArmRestClient arm,
         ILogger<DataCollectionRuleService> logger)
     {
-        _resourceGraph = resourceGraph;
+        _arm = arm;
         _logger = logger;
     }
 
+    /// <summary>
+    /// Lists the data collection rules in the workspace resource group. DCRs in other
+    /// resource groups are not included (known limitation).
+    /// </summary>
     public async Task<DcrResponse> GetDcrStatusAsync(WorkspaceContext workspace, Dictionary<string, DateTime?> lastLogPerTable)
     {
         var response = new DcrResponse { LastChecked = DateTime.UtcNow };
 
         try
         {
-            var dcrItems = await _resourceGraph.GetDcrConfigAsync(workspace);
+            var dcrItems = await _arm.GetAllPagesAsync(
+                $"/subscriptions/{workspace.SubscriptionId}/resourceGroups/{workspace.ResourceGroup}" +
+                "/providers/Microsoft.Insights/dataCollectionRules",
+                ApiVersion);
 
             foreach (var dcr in dcrItems)
             {
@@ -33,12 +42,15 @@ public class DataCollectionRuleService
                     Location  = dcr.TryGetProperty("location", out var locP)  ? locP.GetString()  ?? ""        : ""
                 };
 
-                if (dcr.TryGetProperty("dataSources", out var dataSources))
-                    ExtractDataSources(dataSources, dcrStatus);
+                if (dcr.TryGetProperty("properties", out var props))
+                {
+                    if (props.TryGetProperty("dataSources", out var dataSources))
+                        ExtractDataSources(dataSources, dcrStatus);
 
-                if (dcr.TryGetProperty("destinations", out var destinations) &&
-                    dcr.TryGetProperty("dataFlows",    out var dataFlows))
-                    ExtractDestinations(destinations, dataFlows, dcrStatus, lastLogPerTable);
+                    if (props.TryGetProperty("destinations", out var destinations) &&
+                        props.TryGetProperty("dataFlows",    out var dataFlows))
+                        ExtractDestinations(destinations, dataFlows, dcrStatus, lastLogPerTable);
+                }
 
                 DetermineStatus(dcrStatus);
                 response.DataCollectionRules.Add(dcrStatus);
