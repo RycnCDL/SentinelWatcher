@@ -43,11 +43,6 @@ export async function getWorkspaces(): Promise<WorkspaceInfo[]> {
   return data;
 }
 
-export async function getCurrentUser(): Promise<{ name: string; email: string; objectId: string; tenantId: string }> {
-  const { data } = await api.get('/auth/me');
-  return data;
-}
-
 // ---- Workspace-specific endpoints ----
 
 export async function getAnalyticsRules(ws: WorkspaceInfo): Promise<AnalyticsRulesResponse> {

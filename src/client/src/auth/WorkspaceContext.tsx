@@ -33,11 +33,6 @@ export function useWorkspace() {
   return useContext(WorkspaceCtx);
 }
 
-export function workspaceQueryParams(ws: WorkspaceInfo | null): string {
-  if (!ws) return '';
-  return `subscriptionId=${encodeURIComponent(ws.subscriptionId)}&resourceGroup=${encodeURIComponent(ws.resourceGroup)}&workspaceName=${encodeURIComponent(ws.workspaceName)}&workspaceId=${encodeURIComponent(ws.workspaceId)}`;
-}
-
 const STORAGE_KEY = 'sw-selected-workspace';
 
 export function WorkspaceProvider({ children }: { children: ReactNode }) {
@@ -66,7 +61,6 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     } catch (err: any) {
       // If 401, token may not be ready yet — retry once after a short delay
       if (err?.response?.status === 401 && !retried) {
-        console.warn('Workspace fetch got 401, retrying in 1s...');
         setTimeout(() => loadWorkspaces(true), 1000);
         return;
       }
