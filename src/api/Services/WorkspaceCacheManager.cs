@@ -36,7 +36,7 @@ public class WorkspaceCacheManager
         _logAnalyticsService = logAnalyticsService;
         _logger = logger;
         _refreshMinutes = cacheConfig.Value.HeavyQueryRefreshMinutes;
-        _evictMinutes = 30;
+        _evictMinutes = cacheConfig.Value.EvictAfterMinutes;
     }
 
     public WorkspaceCacheEntry GetOrCreateEntry(WorkspaceContext workspace)
@@ -164,15 +164,24 @@ public class WorkspaceCacheManager
         }
     }
 
-    public void EvictStaleEntries()
+    /// <summary>
+    /// Removes entries that were not requested for EvictAfterMinutes. Entries that are being
+    /// refreshed are kept. Called periodically by CacheEvictionService.
+    /// </summary>
+    /// <returns>The keys of the evicted entries.</returns>
+    public IReadOnlyList<string> EvictStaleEntries(DateTime utcNow)
     {
+        var evicted = new List<string>();
         foreach (var (key, entry) in _caches)
         {
-            if ((DateTime.UtcNow - entry.LastAccessed).TotalMinutes > _evictMinutes)
+            if (!entry.IsRefreshing &&
+                (utcNow - entry.LastAccessed).TotalMinutes > _evictMinutes &&
+                _caches.TryRemove(key, out _))
             {
-                _caches.TryRemove(key, out _);
+                evicted.Add(key);
                 _logger.LogInformation("Evicted stale cache for workspace {Id}", key);
             }
         }
+        return evicted;
     }
 }

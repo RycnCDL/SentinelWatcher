@@ -51,6 +51,7 @@ builder.Services.AddSingleton<WorkspaceService>();
 
 // Per-workspace cache, shared by all viewers (everyone sees data read by the same identity).
 builder.Services.AddSingleton<WorkspaceCacheManager>();
+builder.Services.AddHostedService<CacheEvictionService>();
 
 builder.Services.AddControllers();
 builder.Services.AddOpenApi();
