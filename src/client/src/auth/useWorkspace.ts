@@ -15,6 +15,8 @@ export interface WorkspaceContextType {
   switchWorkspace: (workspace: WorkspaceInfo) => void;
   loading: boolean;
   error: string | null;
+  // True when the API returns 403: the user is signed in but lacks the Viewer app role.
+  accessDenied: boolean;
   refresh: () => void;
 }
 
@@ -24,6 +26,7 @@ export const WorkspaceCtx = createContext<WorkspaceContextType>({
   switchWorkspace: () => {},
   loading: true,
   error: null,
+  accessDenied: false,
   refresh: () => {},
 });
 

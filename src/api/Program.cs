@@ -2,6 +2,7 @@ using Azure.Core;
 using Azure.Monitor.Query.Logs;
 using Microsoft.Extensions.Options;
 using Microsoft.Identity.Web;
+using SentinelWatcher.Api.Auth;
 using SentinelWatcher.Api.Endpoints;
 using SentinelWatcher.Api.Models;
 using SentinelWatcher.Api.Services;
@@ -20,6 +21,15 @@ builder.Services.AddSingleton<WorkspaceRegistry>();
 // Sign-in: validate Entra ID access tokens issued for this app. The API never calls
 // Azure on behalf of the user, so no client secret is needed.
 builder.Services.AddMicrosoftIdentityWebApiAuthentication(builder.Configuration);
+
+// Authorization: every endpoint requires the SentinelWatcher.Viewer app role, including
+// endpoints without an [Authorize] attribute (fallback policy). Only /config.json and the
+// SPA files are anonymous. "Assignment required" on the enterprise app additionally keeps
+// unassigned users from signing in at all.
+builder.Services.AddAuthorizationBuilder()
+    .AddPolicy(AppRoles.ViewerPolicy, AppRoles.BuildViewerPolicy())
+    .SetDefaultPolicy(AppRoles.BuildViewerPolicy())
+    .SetFallbackPolicy(AppRoles.BuildViewerPolicy());
 
 // Azure access: one identity for the whole app (user-assigned managed identity in Azure,
 // DefaultAzureCredential such as az login for local development).
@@ -53,7 +63,7 @@ app.Services.GetRequiredService<WorkspaceRegistry>();
 if (app.Environment.IsDevelopment())
 {
     // OpenAPI document at /openapi/v1.json (development only).
-    app.MapOpenApi();
+    app.MapOpenApi().AllowAnonymous();
 }
 
 // The SPA is served from wwwroot on the same origin as the API, so no CORS is needed.
@@ -69,7 +79,7 @@ app.MapControllers();
 
 // Unknown API routes return 404 instead of falling through to the SPA.
 app.MapFallback("/api/{**path}", () => Results.NotFound());
-app.MapFallbackToFile("index.html");
+app.MapFallbackToFile("index.html").AllowAnonymous();
 
 app.Run();
 

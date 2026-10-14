@@ -3,7 +3,7 @@ import { ChevronDown } from 'lucide-react';
 import { useState, useRef, useEffect } from 'react';
 
 export default function WorkspaceSelector() {
-  const { workspaces, selectedWorkspace, switchWorkspace, loading } = useWorkspace();
+  const { workspaces, selectedWorkspace, switchWorkspace, loading, error } = useWorkspace();
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
@@ -19,6 +19,10 @@ export default function WorkspaceSelector() {
 
   if (loading) {
     return <div className="workspace-selector workspace-selector--loading">Loading workspaces...</div>;
+  }
+
+  if (error) {
+    return <div className="workspace-selector workspace-selector--empty">{error}</div>;
   }
 
   if (workspaces.length === 0) {

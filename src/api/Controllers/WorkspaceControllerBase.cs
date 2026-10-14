@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using SentinelWatcher.Api.Auth;
 using SentinelWatcher.Api.Models;
 using SentinelWatcher.Api.Services;
 
@@ -10,7 +11,7 @@ namespace SentinelWatcher.Api.Controllers;
 /// in the "workspace" query parameter; it must match the configured allow-list exactly.
 /// </summary>
 [ApiController]
-[Authorize]
+[Authorize(Policy = AppRoles.ViewerPolicy)]
 public abstract class WorkspaceControllerBase : ControllerBase
 {
     private readonly WorkspaceRegistry _registry;

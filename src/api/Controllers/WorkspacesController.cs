@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using SentinelWatcher.Api.Auth;
 using SentinelWatcher.Api.Models;
 using SentinelWatcher.Api.Services;
 
@@ -7,7 +8,7 @@ namespace SentinelWatcher.Api.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
-[Authorize]
+[Authorize(Policy = AppRoles.ViewerPolicy)]
 public class WorkspacesController : ControllerBase
 {
     private readonly WorkspaceService _workspaceService;

@@ -21,6 +21,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const [selectedWorkspace, setSelectedWorkspace] = useState<WorkspaceInfo | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [accessDenied, setAccessDenied] = useState(false);
 
   // Sets state only in promise callbacks, so it can run directly from the mount effect.
   const fetchWorkspaces = useCallback(() =>
@@ -40,6 +41,9 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
         }
       })
       .catch((err: unknown) => {
+        if (isAxiosError(err) && err.response?.status === 403) {
+          setAccessDenied(true);
+        }
         setError('Failed to load workspaces');
         console.error(err);
       })
@@ -52,6 +56,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const refresh = useCallback(() => {
     setLoading(true);
     setError(null);
+    setAccessDenied(false);
     fetchWorkspaces();
   }, [fetchWorkspaces]);
 
@@ -62,7 +67,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
 
   return (
     <WorkspaceCtx.Provider
-      value={{ workspaces, selectedWorkspace, switchWorkspace, loading, error, refresh }}
+      value={{ workspaces, selectedWorkspace, switchWorkspace, loading, error, accessDenied, refresh }}
     >
       {children}
     </WorkspaceCtx.Provider>
