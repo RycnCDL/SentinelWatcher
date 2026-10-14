@@ -1,6 +1,5 @@
 using Azure.Core;
 using Azure.Monitor.Query;
-using Azure.ResourceManager;
 using Microsoft.Identity.Web;
 
 namespace SentinelWatcher.Api.Services;
@@ -23,18 +22,6 @@ public class UserAzureClientFactory
     {
         _tokenAcquisition = tokenAcquisition;
         _logger = logger;
-    }
-
-    public async Task<TokenCredential> GetArmTokenCredentialAsync()
-    {
-        var token = await _tokenAcquisition.GetAccessTokenForUserAsync(ArmScopes);
-        return new StaticTokenCredential(token);
-    }
-
-    public async Task<ArmClient> CreateArmClientAsync()
-    {
-        var credential = await GetArmTokenCredentialAsync();
-        return new ArmClient(credential);
     }
 
     public async Task<LogsQueryClient> CreateLogsQueryClientAsync()

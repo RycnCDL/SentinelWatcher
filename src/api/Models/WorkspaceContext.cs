@@ -28,11 +28,3 @@ public class WorkspaceInfo
     public string Location { get; set; } = string.Empty;
     public bool SentinelEnabled { get; set; }
 }
-
-public class UserInfo
-{
-    public string Name { get; set; } = string.Empty;
-    public string Email { get; set; } = string.Empty;
-    public string ObjectId { get; set; } = string.Empty;
-    public string TenantId { get; set; } = string.Empty;
-}
