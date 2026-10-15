@@ -18,13 +18,18 @@
 .PARAMETER OutputDir
     Folder for the package. Defaults to artifacts in the repository root.
 
+.PARAMETER Version
+    Version stamped into the API assembly, for example 0.1.0. The release workflow passes the
+    tag without its leading v. Optional.
+
 .EXAMPLE
     pwsh scripts/build-package.ps1
 #>
 [CmdletBinding()]
 param(
     [string] $Dotnet,
-    [string] $OutputDir
+    [string] $OutputDir,
+    [string] $Version
 )
 
 $ErrorActionPreference = 'Stop'
@@ -57,8 +62,17 @@ finally {
 }
 
 if (Test-Path $publishDir) { Remove-Item $publishDir -Recurse -Force }
+$project = Join-Path $root 'src/api/SentinelWatcher.Api.csproj'
+# Built as an array explicitly: "if" as an expression would unroll a single item to a string,
+# which splatting then passes character by character.
+$versionArgs = @()
+if ($Version) { $versionArgs += "-p:Version=$Version" }
+# A full rebuild, so settings such as PathMap (Directory.Build.props) always apply.
+Invoke-Step 'dotnet build' {
+    & $Dotnet build $project -c Release --no-incremental --nologo @versionArgs
+}
 Invoke-Step 'dotnet publish' {
-    & $Dotnet publish (Join-Path $root 'src/api/SentinelWatcher.Api.csproj') -c Release -o $publishDir --nologo
+    & $Dotnet publish $project -c Release --no-build -o $publishDir --nologo @versionArgs
 }
 
 # Development settings must never ship. appsettings.Development.json is gitignored, but a local
