@@ -36,6 +36,7 @@ jobs:
           awk -v v="$version" '
             index($0, "## [" v "]") == 1 { found = 1; next }
             found && /^## \[/ { exit }
+            found && /^\[[^]]+\]: / { exit }
             found { print }
           ' CHANGELOG.md > "$RUNNER_TEMP/notes.md"
           if [ ! -s "$RUNNER_TEMP/notes.md" ]; then
