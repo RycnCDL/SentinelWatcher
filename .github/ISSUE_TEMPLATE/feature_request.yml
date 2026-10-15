@@ -1,0 +1,29 @@
+name: Feature request
+description: An idea for something SentinelWatcher should show or do.
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem would this solve?
+      description: Who needs it, and what do they do today without it?
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: What would you like to see?
+    validations:
+      required: true
+
+  - type: textarea
+    id: data
+    attributes:
+      label: Data and permissions
+      description: Which Sentinel or Azure data would it need? New Azure permissions for the managed identity need a good reason, see docs/permissions.md.
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives you considered
