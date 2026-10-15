@@ -13,7 +13,10 @@ import { RefreshCw, ShieldCheck } from 'lucide-react';
 import { useWorkspace } from '../auth/useWorkspace';
 import { getAnalyticsRules, refreshAnalyticsRules } from '../services/api';
 import { useChartTheme } from '../hooks/useTheme';
-import type { AnalyticsRulesResponse } from '../types';
+import type { AnalyticsRulesResponse, LoadError } from '../types';
+import { LoadErrorState, StaleDataBanner } from '../components/LoadErrorState';
+import { loadErrorOf } from '../services/loadError';
+
 
 const SEVERITY_COLORS: Record<string, string> = {
   High: '#FF4D4D',
@@ -95,16 +98,25 @@ export default function AnalyticsRules() {
   const [data, setData] = useState<AnalyticsRulesResponse | null>(null);
   const [settledKey, setSettledKey] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState<LoadError | null>(null);
   const loading = !selectedWorkspace || settledKey !== selectedWorkspace.resourceId;
 
-  const fetchData = useCallback(async () => {
-    if (!selectedWorkspace) return;
-    try {
-      const result = await getAnalyticsRules(selectedWorkspace);
-      setData(result);
-    } finally {
-      setSettledKey(selectedWorkspace.resourceId);
-    }
+  // State is only set in promise callbacks, so this can run directly from the effect.
+  const fetchData = useCallback((): Promise<void> => {
+    if (!selectedWorkspace) return Promise.resolve();
+    const ws = selectedWorkspace;
+    return getAnalyticsRules(ws)
+      .then(
+        (result) => {
+          setData(result);
+          setError(null);
+        },
+        (err: unknown) => {
+          setData(null);
+          setError(loadErrorOf(err));
+        },
+      )
+      .finally(() => setSettledKey(ws.resourceId));
   }, [selectedWorkspace]);
 
   async function handleRefresh() {
@@ -125,7 +137,16 @@ export default function AnalyticsRules() {
   }, [fetchData]);
 
   if (loading) return <div className="loading">Loading analytics rules...</div>;
-  if (!data) return <div className="error">Failed to load data</div>;
+  if (!data) {
+    return (
+      <div className="page">
+        <div className="page-header">
+          <h2 className="page-title">Analytics Rules</h2>
+        </div>
+        {error && <LoadErrorState error={error} what="Analytics rules" />}
+      </div>
+    );
+  }
 
   const topChartData = data.top20MostIncidents.map((r) => ({
     name: r.ruleName.length > 40 ? r.ruleName.slice(0, 40) + '...' : r.ruleName,
@@ -140,7 +161,9 @@ export default function AnalyticsRules() {
         <div className="page-meta">
           <span className="meta-text">
             {data.totalRules} rules |{' '}
-            {data.incidentsLoaded ? `${data.totalIncidents} incidents (30d)` : 'loading incidents...'} |
+            {data.incidentsLoaded
+              ? `${data.totalIncidents} incidents (30d)`
+              : data.incidentsError ? 'incident counts unavailable' : 'loading incidents...'} |
             Last refresh: {new Date(data.lastRefreshed).toLocaleTimeString()}
           </span>
           <button
@@ -154,11 +177,15 @@ export default function AnalyticsRules() {
         </div>
       </div>
 
+      <StaleDataBanner error={data.refreshError} since={data.lastRefreshed} />
+
       {data.incidentsLoaded && <IncidentSources data={data} />}
 
       <div className="section">
         <h3>Top 20 Rules: Most Incidents</h3>
-        {!data.incidentsLoaded ? (
+        {data.incidentsError ? (
+          <LoadErrorState error={data.incidentsError} what="Incident counts" />
+        ) : !data.incidentsLoaded ? (
           <p className="meta-text" style={{ textAlign: 'center', padding: '2rem 0' }}>Loading incident counts...</p>
         ) : topChartData.length === 0 ? (
           <div style={{ textAlign: 'center', padding: '2.5rem 1rem' }}>
@@ -250,8 +277,8 @@ export default function AnalyticsRules() {
                     {r.severity}
                   </span>
                 </td>
-                <td className="text-right">{data.incidentsLoaded ? r.incidentCount : '...'}</td>
-                <td>{formatDate(r.lastIncident, 'Never')}</td>
+                <td className="text-right">{data.incidentsLoaded ? r.incidentCount : data.incidentsError ? 'n/a' : '...'}</td>
+                <td>{data.incidentsLoaded ? formatDate(r.lastIncident, 'Never') : '-'}</td>
               </tr>
             ))}
           </tbody>

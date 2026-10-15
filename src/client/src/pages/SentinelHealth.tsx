@@ -11,7 +11,10 @@ import type {
   ConnectorCurrentStatus,
   HealthFailureEvent,
   HealthTrendPoint,
+  LoadError,
 } from '../types';
+import { LoadErrorState } from '../components/LoadErrorState';
+import { loadErrorOf } from '../services/loadError';
 import { useChartTheme } from '../hooks/useTheme';
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
@@ -167,6 +170,7 @@ export default function SentinelHealth() {
   // from it instead of being set synchronously inside the effect.
   const [settledKey, setSettledKey] = useState<string | null>(null);
   const [connectorFilter, setConnectorFilter] = useState<'all' | 'issues'>('all');
+  const [error, setError] = useState<LoadError | null>(null);
   const chart = useChartTheme();
 
   const requestKey = selectedWorkspace ? `${selectedWorkspace.resourceId}|${days}` : null;
@@ -175,15 +179,33 @@ export default function SentinelHealth() {
   useEffect(() => {
     if (!selectedWorkspace || requestKey === null) return;
     getSentinelHealth(selectedWorkspace, days)
-      .then(setData)
-      .catch(console.error)
+      .then((result) => {
+        setData(result);
+        setError(null);
+      })
+      .catch((err: unknown) => {
+        // A failure is an error, never "health monitoring not enabled".
+        setData(null);
+        setError(loadErrorOf(err));
+      })
       .finally(() => setSettledKey(requestKey));
   }, [selectedWorkspace, days, requestKey]);
 
   if (loading) return <div className="loading">Loading Sentinel Health…</div>;
 
+  if (!data) {
+    return (
+      <div className="page">
+        <div className="page-header">
+          <h2 className="page-title">Sentinel Health</h2>
+        </div>
+        {error && <LoadErrorState error={error} what="Sentinel Health" />}
+      </div>
+    );
+  }
+
   // ── Not enabled ─────────────────────────────────────────────────────────────
-  if (!data || !data.healthMonitoringEnabled) {
+  if (!data.healthMonitoringEnabled) {
     return (
       <div className="page">
         <div className="page-header">

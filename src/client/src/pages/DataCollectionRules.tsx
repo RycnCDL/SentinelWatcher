@@ -7,7 +7,10 @@ import {
 } from 'lucide-react';
 import { useWorkspace } from '../auth/useWorkspace';
 import { getDcr } from '../services/api';
-import type { DcrResponse } from '../types';
+import type { DcrResponse, LoadError } from '../types';
+import { LoadErrorState, StaleDataBanner } from '../components/LoadErrorState';
+import { loadErrorOf } from '../services/loadError';
+
 import StatusCard from '../components/StatusCard';
 
 const STATUS_ICON = {
@@ -29,6 +32,7 @@ export default function DataCollectionRules() {
   const [data, setData] = useState<DcrResponse | null>(null);
   const [settledKey, setSettledKey] = useState<string | null>(null);
   const [expanded, setExpanded] = useState<string | null>(null);
+  const [error, setError] = useState<LoadError | null>(null);
   const loading = !selectedWorkspace || settledKey !== selectedWorkspace.resourceId;
 
   useEffect(() => {
@@ -38,6 +42,10 @@ export default function DataCollectionRules() {
       try {
         const result = await getDcr(ws);
         setData(result);
+        setError(null);
+      } catch (err) {
+        setData(null);
+        setError(loadErrorOf(err));
       } finally {
         setSettledKey(ws.resourceId);
       }
@@ -48,7 +56,16 @@ export default function DataCollectionRules() {
   }, [selectedWorkspace]);
 
   if (loading) return <div className="loading">Loading DCR data...</div>;
-  if (!data) return <div className="error">Failed to load data</div>;
+  if (!data) {
+    return (
+      <div className="page">
+        <div className="page-header">
+          <h2 className="page-title">Data Collection Rules</h2>
+        </div>
+        {error && <LoadErrorState error={error} what="Data collection rules" />}
+      </div>
+    );
+  }
 
   return (
     <div className="page">
@@ -58,6 +75,8 @@ export default function DataCollectionRules() {
           Last checked: {new Date(data.lastChecked).toLocaleTimeString()}
         </span>
       </div>
+
+      <StaleDataBanner error={data.refreshError} since={data.lastChecked} />
 
       <div className="cards-grid">
         <StatusCard

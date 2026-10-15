@@ -8,7 +8,10 @@ import {
 } from 'lucide-react';
 import { useWorkspace } from '../auth/useWorkspace';
 import { getDataConnectors } from '../services/api';
-import type { DataConnectorsResponse, ConnectorHealth } from '../types';
+import type { DataConnectorsResponse, ConnectorHealth, LoadError } from '../types';
+import { LoadErrorState, PartialDataBanner, StaleDataBanner } from '../components/LoadErrorState';
+import { loadErrorOf } from '../services/loadError';
+
 
 const STATUS_CONFIG = {
   Healthy: {
@@ -110,16 +113,25 @@ export default function DataConnectors() {
   const [data, setData] = useState<DataConnectorsResponse | null>(null);
   const [settledKey, setSettledKey] = useState<string | null>(null);
   const [filter, setFilter] = useState<string>('all');
+  const [error, setError] = useState<LoadError | null>(null);
   const loading = !selectedWorkspace || settledKey !== selectedWorkspace.resourceId;
 
-  const fetchData = useCallback(async () => {
-    if (!selectedWorkspace) return;
-    try {
-      const result = await getDataConnectors(selectedWorkspace);
-      setData(result);
-    } finally {
-      setSettledKey(selectedWorkspace.resourceId);
-    }
+  // State is only set in promise callbacks, so this can run directly from the effect.
+  const fetchData = useCallback((): Promise<void> => {
+    if (!selectedWorkspace) return Promise.resolve();
+    const ws = selectedWorkspace;
+    return getDataConnectors(ws)
+      .then(
+        (result) => {
+          setData(result);
+          setError(null);
+        },
+        (err: unknown) => {
+          setData(null);
+          setError(loadErrorOf(err));
+        },
+      )
+      .finally(() => setSettledKey(ws.resourceId));
   }, [selectedWorkspace]);
 
   useEffect(() => {
@@ -129,7 +141,16 @@ export default function DataConnectors() {
   }, [fetchData]);
 
   if (loading) return <div className="loading">Loading data connectors...</div>;
-  if (!data) return <div className="error">Failed to load data</div>;
+  if (!data) {
+    return (
+      <div className="page">
+        <div className="page-header">
+          <h2 className="page-title">Data Connectors: Data freshness</h2>
+        </div>
+        {error && <LoadErrorState error={error} what="Data connectors" />}
+      </div>
+    );
+  }
 
   const filtered =
     filter === 'all'
@@ -144,6 +165,9 @@ export default function DataConnectors() {
           Based on the newest record per table | Last checked: {new Date(data.lastChecked).toLocaleTimeString()}
         </span>
       </div>
+
+      <StaleDataBanner error={data.refreshError} since={data.lastChecked} />
+      <PartialDataBanner error={data.partialError} />
 
       <div className="filter-bar">
         {['all', 'Healthy', 'Warning', 'Error', 'Quiet', 'Unknown'].map((f) => (

@@ -490,6 +490,37 @@ nav {
   box-shadow: 0 0 8px rgba(107, 114, 128, 0.2);
 }
 
+/* ===== Load errors ===== */
+.load-error {
+  border-left: 3px solid var(--danger);
+}
+
+.load-error__title {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: var(--danger);
+}
+
+.load-error__message {
+  margin: 0.6rem 0 0.4rem;
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+}
+
+.load-error__code {
+  color: var(--text-muted);
+  font-size: 0.72rem;
+  font-family: ui-monospace, monospace;
+}
+
+.load-state {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: var(--text-muted);
+}
+
 .badge--inline {
   margin-left: 0.5rem;
   padding: 0.1rem 0.5rem;

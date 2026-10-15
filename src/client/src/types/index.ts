@@ -1,3 +1,9 @@
+// Why a section could not be loaded. The message is generic; details are in the server log.
+export interface LoadError {
+  code: string;
+  message: string;
+}
+
 export interface AnalyticsRuleStats {
   ruleId: string;
   ruleName: string;
@@ -38,6 +44,10 @@ export interface AnalyticsRulesResponse {
   missingRules: MissingRuleIncidents[];
   noRuleSources: NoRuleIncidents[];
   lastRefreshed: string;
+  // The incident counts could not be read (the rule list is valid).
+  incidentsError: LoadError | null;
+  // The latest refresh failed; this is older data.
+  refreshError: LoadError | null;
 }
 
 export interface TableIngestion {
@@ -62,6 +72,9 @@ export interface IngestionResponse {
   totalEstimatedCostUSD: number;
   daysAnalyzed: number;
   lastRefreshed: string;
+  // Part of the data could not be read (the rest is valid).
+  partialError: LoadError | null;
+  refreshError: LoadError | null;
 }
 
 export interface ConnectorHealth {
@@ -84,6 +97,9 @@ export interface DataConnectorsResponse {
   errorCount: number;
   quietCount: number;
   lastChecked: string;
+  // The list may be incomplete.
+  partialError: LoadError | null;
+  refreshError: LoadError | null;
 }
 
 export interface DcrDestination {
@@ -113,6 +129,7 @@ export interface DcrResponse {
   warningCount: number;
   errorCount: number;
   lastChecked: string;
+  refreshError: LoadError | null;
 }
 
 // ── Sentinel Health ───────────────────────────────────────────────────────────

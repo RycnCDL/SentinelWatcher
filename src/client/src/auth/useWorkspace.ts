@@ -6,7 +6,8 @@ export interface WorkspaceInfo {
   workspaceName: string;
   subscriptionId: string;
   resourceGroup: string;
-  sentinelEnabled: boolean;
+  // null when the status could not be read.
+  sentinelEnabled: boolean | null;
 }
 
 export interface WorkspaceContextType {

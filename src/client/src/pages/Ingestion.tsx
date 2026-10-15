@@ -14,7 +14,10 @@ import {
 } from 'recharts';
 import { useWorkspace } from '../auth/useWorkspace';
 import { getIngestion, getDataConnectors } from '../services/api';
-import type { IngestionResponse, DataConnectorsResponse } from '../types';
+import type { IngestionResponse, DataConnectorsResponse, LoadError } from '../types';
+import { LoadErrorState, PartialDataBanner, StaleDataBanner } from '../components/LoadErrorState';
+import { loadErrorOf } from '../services/loadError';
+
 import { formatGb, formatNumber, formatUsd } from '../utils/format';
 
 const COLORS = [
@@ -53,6 +56,7 @@ export default function Ingestion() {
   const [connectors, setConnectors] = useState<DataConnectorsResponse | null>(null);
   const [settledKey, setSettledKey] = useState<string | null>(null);
   const [selectedConnector, setSelectedConnector] = useState<string>('all');
+  const [error, setError] = useState<LoadError | null>(null);
   const loading = !selectedWorkspace || settledKey !== selectedWorkspace.resourceId;
 
   useEffect(() => {
@@ -61,8 +65,14 @@ export default function Ingestion() {
     async function fetchData() {
       try {
         const [ing, conn] = await Promise.allSettled([getIngestion(ws), getDataConnectors(ws)]);
-        if (ing.status === 'fulfilled') setData(ing.value);
-        if (conn.status === 'fulfilled') setConnectors(conn.value);
+        if (ing.status === 'fulfilled') {
+          setData(ing.value);
+          setError(null);
+        } else {
+          setData(null);
+          setError(loadErrorOf(ing.reason));
+        }
+        setConnectors(conn.status === 'fulfilled' ? conn.value : null);
       } finally {
         setSettledKey(ws.resourceId);
       }
@@ -80,7 +90,16 @@ export default function Ingestion() {
   }, [selectedConnector, connectors]);
 
   if (loading) return <div className="loading">Loading ingestion data...</div>;
-  if (!data) return <div className="error">Failed to load data</div>;
+  if (!data) {
+    return (
+      <div className="page">
+        <div className="page-header">
+          <h2 className="page-title">Log Ingestion</h2>
+        </div>
+        {error && <LoadErrorState error={error} what="Log ingestion" />}
+      </div>
+    );
+  }
 
   const filteredTables = allowedTables
     ? data.tables.filter((t) => allowedTables.has(t.tableName))
@@ -120,6 +139,9 @@ export default function Ingestion() {
           Last refresh: {new Date(data.lastRefreshed).toLocaleTimeString()}
         </span>
       </div>
+
+      <StaleDataBanner error={data.refreshError} since={data.lastRefreshed} />
+      <PartialDataBanner error={data.partialError} />
 
       {/* Connector Filter */}
       {connectors && connectors.connectors.length > 0 && (

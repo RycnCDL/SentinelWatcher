@@ -10,7 +10,8 @@ import {
 import StatusCard from '../components/StatusCard';
 import { useWorkspace } from '../auth/useWorkspace';
 import { getAnalyticsRules, getIngestion, getDataConnectors, getDcr } from '../services/api';
-import type { AnalyticsRulesResponse, IngestionResponse, DataConnectorsResponse, DcrResponse } from '../types';
+import type { AnalyticsRulesResponse, IngestionResponse, DataConnectorsResponse, DcrResponse, LoadError } from '../types';
+import { LOAD_ERROR_TITLE, loadErrorOf } from '../services/loadError';
 import { useChartTheme } from '../hooks/useTheme';
 import { isDcrPageEnabled } from '../config/runtimeConfig';
 import { formatGb, formatUsd } from '../utils/format';
@@ -40,12 +41,31 @@ function ConnectorDot({ status }: { status: string }) {
   return <span style={{ display: 'inline-block', width: 8, height: 8, borderRadius: '50%', background: color, boxShadow: `0 0 5px ${color}`, flexShrink: 0 }} />;
 }
 
+type Section = 'analytics' | 'ingestion' | 'connectors' | 'dcr';
+
+const NO_ERRORS: Record<Section, LoadError | null> = { analytics: null, ingestion: null, connectors: null, dcr: null };
+
+const SECTION_LABELS: Record<Section, string> = {
+  analytics: 'Analytics rules',
+  ingestion: 'Log ingestion',
+  connectors: 'Data freshness',
+  dcr: 'Data collection rules',
+};
+
+// Value, subtitle and color of a KPI card whose data is missing: an error or still loading.
+function missing(error: LoadError | null) {
+  return error
+    ? { value: 'Error', subtitle: LOAD_ERROR_TITLE, color: 'red' as const }
+    : { value: '…', subtitle: 'Loading…', color: 'blue' as const };
+}
+
 export default function Dashboard() {
   const { selectedWorkspace } = useWorkspace();
   const [analytics, setAnalytics] = useState<AnalyticsRulesResponse | null>(null);
   const [ingestion, setIngestion]   = useState<IngestionResponse | null>(null);
   const [connectors, setConnectors] = useState<DataConnectorsResponse | null>(null);
   const [dcr, setDcr]               = useState<DcrResponse | null>(null);
+  const [errors, setErrors] = useState<Record<Section, LoadError | null>>(NO_ERRORS);
   const [settledKey, setSettledKey] = useState<string | null>(null);
   const loading = !selectedWorkspace || settledKey !== selectedWorkspace.resourceId;
   const chart = useChartTheme();
@@ -62,10 +82,17 @@ export default function Dashboard() {
           getAnalyticsRules(ws), getIngestion(ws), getDataConnectors(ws),
           showDcr ? getDcr(ws) : Promise.reject(new Error('DCR page disabled')),
         ]);
-        if (a.status === 'fulfilled') setAnalytics(a.value);
-        if (i.status === 'fulfilled') setIngestion(i.value);
-        if (c.status === 'fulfilled') setConnectors(c.value);
-        if (d.status === 'fulfilled') setDcr(d.value);
+        // A failed section shows its error, never empty data (which would read as zeros or "all good").
+        setAnalytics(a.status === 'fulfilled' ? a.value : null);
+        setIngestion(i.status === 'fulfilled' ? i.value : null);
+        setConnectors(c.status === 'fulfilled' ? c.value : null);
+        setDcr(d.status === 'fulfilled' ? d.value : null);
+        setErrors({
+          analytics: a.status === 'rejected' ? loadErrorOf(a.reason) : null,
+          ingestion: i.status === 'rejected' ? loadErrorOf(i.reason) : null,
+          connectors: c.status === 'rejected' ? loadErrorOf(c.reason) : null,
+          dcr: showDcr && d.status === 'rejected' ? loadErrorOf(d.reason) : null,
+        });
       } finally {
         setSettledKey(ws.resourceId);
       }
@@ -112,6 +139,70 @@ export default function Dashboard() {
   const connectorErrorCount = connectors?.errorCount ?? 0;
   const connectorWarnCount  = connectors?.warningCount ?? 0;
   const dcrErrors = dcr?.errorCount ?? 0;
+  const dcrWarnings = dcr?.warningCount ?? 0;
+  const failedSections = (Object.keys(errors) as Section[]).filter(k => errors[k] && errors[k]!.code !== 'Loading');
+  const staleSections = [
+    analytics?.refreshError && SECTION_LABELS.analytics,
+    ingestion?.refreshError && SECTION_LABELS.ingestion,
+    connectors?.refreshError && SECTION_LABELS.connectors,
+    dcr?.refreshError && SECTION_LABELS.dcr,
+  ].filter(Boolean);
+
+  const incidentsText = !analytics ? '-'
+    : analytics.incidentsLoaded ? String(analytics.totalIncidents)
+    : analytics.incidentsError ? 'n/a' : '…';
+
+  const analyticsCard = analytics
+    ? {
+        value: analytics.totalRules,
+        subtitle: analytics.incidentsLoaded
+          ? `${analytics.totalIncidents} incidents · ${enabledCount} enabled`
+          : analytics.incidentsError
+            ? `Incident counts unavailable · ${enabledCount} enabled`
+            : `Loading incidents · ${enabledCount} enabled`,
+        color: 'blue' as const,
+      }
+    : missing(errors.analytics);
+
+  const ingestionCard = ingestion
+    ? {
+        value: formatGb(ingestion.totalVolumeGB, 1),
+        subtitle: `Est. ${formatUsd(ingestion.totalEstimatedCostUSD)} · ${ingestion.tables.length} tables`,
+        color: 'purple' as const,
+      }
+    : missing(errors.ingestion);
+
+  // "All ... receiving data" only when the data is complete and from the latest refresh.
+  const connectorsCard = connectors
+    ? {
+        value: `${connectors.healthyCount} / ${connectors.connectors.length}`,
+        subtitle:
+          connectorErrorCount > 0 ? `${connectorErrorCount} error${connectorErrorCount > 1 ? 's' : ''}, ${connectorWarnCount} warning${connectorWarnCount !== 1 ? 's' : ''}`
+          : connectorWarnCount > 0 ? `${connectorWarnCount} warning${connectorWarnCount > 1 ? 's' : ''}`
+          : connectors.partialError ? 'Connector list may be incomplete'
+          : connectors.refreshError ? 'Latest refresh failed, older data'
+          : connectors.connectors.length === 0 ? 'No connectors detected'
+          : connectors.quietCount > 0 ? `Receiving data, ${connectors.quietCount} quiet`
+          : 'All connectors receiving data',
+        color: connectorErrorCount > 0 ? 'red' as const
+          : connectorWarnCount > 0 || connectors.partialError || connectors.refreshError ? 'yellow' as const
+          : 'green' as const,
+      }
+    : missing(errors.connectors);
+
+  const dcrCard = dcr
+    ? {
+        value: `${dcr.healthyCount} / ${dcr.totalCount}`,
+        subtitle:
+          dcrErrors > 0 ? `${dcrErrors} error${dcrErrors > 1 ? 's' : ''}`
+          : dcrWarnings > 0 ? `${dcrWarnings} warning${dcrWarnings > 1 ? 's' : ''}`
+          : dcr.refreshError ? 'Latest refresh failed, older data'
+          : dcr.totalCount === 0 ? 'No DCRs in the workspace resource group'
+          : dcr.healthyCount < dcr.totalCount ? `${dcr.totalCount - dcr.healthyCount} not checked`
+          : 'All receiving data',
+        color: dcrErrors > 0 || dcrWarnings > 0 || dcr.refreshError ? 'yellow' as const : 'green' as const,
+      }
+    : missing(errors.dcr);
 
   return (
     <div className="page">
@@ -126,41 +217,53 @@ export default function Dashboard() {
         )}
       </div>
 
+      {/* ── Load errors ── */}
+      {failedSections.length > 0 && (
+        <div className="alert alert--error" role="alert">
+          <AlertTriangle size={14} />
+          <span>
+            <strong>{LOAD_ERROR_TITLE}.</strong>{' '}
+            Failed: {failedSections.map(k => `${SECTION_LABELS[k]} (${errors[k]!.code})`).join(', ')}.
+          </span>
+        </div>
+      )}
+      {staleSections.length > 0 && (
+        <div className="alert alert--warning" role="status">
+          <AlertTriangle size={14} />
+          <span>The latest refresh failed for {staleSections.join(', ')}. Showing older data.</span>
+        </div>
+      )}
+
       {/* ── KPI Cards ── */}
       <div className="cards-grid">
         <StatusCard
           title="Analytics Rules"
-          value={analytics?.totalRules ?? '-'}
-          subtitle={`${analytics?.totalIncidents ?? 0} incidents · ${enabledCount} enabled`}
-          icon={<ShieldAlert size={24} />}
-          color="blue"
+          value={analyticsCard.value}
+          subtitle={analyticsCard.subtitle}
+          icon={analytics ? <ShieldAlert size={24} /> : errors.analytics ? <AlertTriangle size={24} /> : <ShieldAlert size={24} />}
+          color={analyticsCard.color}
         />
         <StatusCard
           title="Log Ingestion (30d)"
-          value={formatGb(ingestion?.totalVolumeGB, 1)}
-          subtitle={`Est. ${formatUsd(ingestion?.totalEstimatedCostUSD)} · ${ingestion?.tables?.length ?? 0} tables`}
-          icon={<Database size={24} />}
-          color="purple"
+          value={ingestionCard.value}
+          subtitle={ingestionCard.subtitle}
+          icon={!ingestion && errors.ingestion ? <AlertTriangle size={24} /> : <Database size={24} />}
+          color={ingestionCard.color}
         />
         <StatusCard
           title="Data freshness"
-          value={`${connectors?.healthyCount ?? '-'} / ${connectors?.connectors?.length ?? '-'}`}
-          subtitle={
-            connectorErrorCount > 0 ? `${connectorErrorCount} error${connectorErrorCount > 1 ? 's' : ''}, ${connectorWarnCount} warning${connectorWarnCount !== 1 ? 's' : ''}`
-            : connectorWarnCount > 0 ? `${connectorWarnCount} warning${connectorWarnCount > 1 ? 's' : ''}`
-            : (connectors?.quietCount ?? 0) > 0 ? `Receiving data, ${connectors?.quietCount} quiet`
-            : 'All connectors receiving data'
-          }
-          icon={connectorErrorCount > 0 ? <AlertTriangle size={24} /> : <Cable size={24} />}
-          color={connectorErrorCount > 0 ? 'red' : connectorWarnCount > 0 ? 'yellow' : 'green'}
+          value={connectorsCard.value}
+          subtitle={connectorsCard.subtitle}
+          icon={connectorErrorCount > 0 || (!connectors && errors.connectors) ? <AlertTriangle size={24} /> : <Cable size={24} />}
+          color={connectorsCard.color}
         />
         {showDcr && (
           <StatusCard
             title="DCR Status"
-            value={`${dcr?.healthyCount ?? '-'} / ${dcr?.totalCount ?? '-'}`}
-            subtitle={dcrErrors > 0 ? `${dcrErrors} error${dcrErrors > 1 ? 's' : ''}` : 'All receiving data'}
-            icon={dcrErrors > 0 ? <AlertTriangle size={24} /> : <CheckCircle size={24} />}
-            color={dcrErrors > 0 ? 'yellow' : 'green'}
+            value={dcrCard.value}
+            subtitle={dcrCard.subtitle}
+            icon={dcrErrors > 0 || (!dcr && errors.dcr) ? <AlertTriangle size={24} /> : <CheckCircle size={24} />}
+            color={dcrCard.color}
           />
         )}
       </div>
@@ -228,6 +331,8 @@ export default function Dashboard() {
                   {disabledCount > 0 && <span style={{ color: 'var(--danger)' }}>● {disabledCount} disabled</span>}
                   {analytics.incidentsLoaded
                     ? <span style={{ color: 'var(--warning)' }}>{rulesWithIncidents} firing</span>
+                    : analytics.incidentsError
+                    ? <span style={{ color: 'var(--danger)' }}>incident counts unavailable</span>
                     : <span style={{ color: 'var(--text-muted)', fontStyle: 'italic' }}>loading incidents…</span>
                   }
                 </div>
@@ -262,7 +367,7 @@ export default function Dashboard() {
                         </span>
                       </td>
                       <td style={{ textAlign: 'right', fontWeight: 700, color: r.incidentCount > 0 ? 'var(--warning)' : 'var(--text-muted)' }}>
-                        {analytics.incidentsLoaded ? r.incidentCount : <span style={{ fontSize: '0.7rem', fontStyle: 'italic' }}>…</span>}
+                        {analytics.incidentsLoaded ? r.incidentCount : <span style={{ fontSize: '0.7rem', fontStyle: 'italic' }}>{analytics.incidentsError ? 'n/a' : '…'}</span>}
                       </td>
                       <td><RelativeTime iso={r.lastIncident} /></td>
                     </tr>
@@ -322,8 +427,8 @@ export default function Dashboard() {
             <h3>Quick Stats</h3>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
               {[
-                { icon: <ShieldCheck size={14} />, label: 'Rules with incidents',  value: analytics ? (analytics.incidentsLoaded ? rulesWithIncidents : '…') : '-', color: rulesWithIncidents > 0 ? 'var(--warning)' : 'var(--healthy)' },
-                { icon: <Activity     size={14} />, label: 'Total incidents (30d)', value: analytics?.totalIncidents ?? '-', color: (analytics?.totalIncidents ?? 0) > 0 ? 'var(--warning)' : 'var(--text-primary)' },
+                { icon: <ShieldCheck size={14} />, label: 'Rules with incidents',  value: analytics ? (analytics.incidentsLoaded ? rulesWithIncidents : analytics.incidentsError ? 'n/a' : '…') : '-', color: rulesWithIncidents > 0 ? 'var(--warning)' : 'var(--healthy)' },
+                { icon: <Activity     size={14} />, label: 'Total incidents (30d)', value: incidentsText, color: analytics?.incidentsLoaded && analytics.totalIncidents > 0 ? 'var(--warning)' : 'var(--text-primary)' },
                 { icon: <TrendingUp   size={14} />, label: 'Daily avg ingestion',   value: ingestion ? formatGb(ingestion.totalVolumeGB / (ingestion.daysAnalyzed || 30)) : '-', color: 'var(--text-primary)' },
                 { icon: <Database     size={14} />, label: 'Ingestion tables',      value: ingestion?.tables?.length ?? '-', color: 'var(--text-primary)' },
               ].map(s => (
