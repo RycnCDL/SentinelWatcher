@@ -31,12 +31,34 @@ public class NoRuleIncidents
     public DateTime? LastIncident { get; set; }
 }
 
+/// <summary>Number of rules with one severity, over all rules.</summary>
+public class RuleSeverityCount
+{
+    public string Severity { get; set; } = string.Empty;
+    public int Total { get; set; }
+    public int Enabled { get; set; }
+}
+
 public class AnalyticsRulesResponse
 {
-    /// <summary>Existing rules with at least one incident, most incidents first.</summary>
+    // The two lists are for display and hold at most 20 rules each. Counts and breakdowns
+    // use the fields below, which are computed from all rules.
+
+    /// <summary>Existing rules with at least one incident, most incidents first (at most 20).</summary>
     public List<AnalyticsRuleStats> Top20MostIncidents { get; set; } = new();
+
+    /// <summary>Enabled rules with the fewest incidents (at most 20).</summary>
     public List<AnalyticsRuleStats> Top20LeastIncidents { get; set; } = new();
+
     public int TotalRules { get; set; }
+    public int EnabledRules { get; set; }
+    public int DisabledRules { get; set; }
+
+    /// <summary>Existing rules with at least one incident in the last 30 days. 0 until IncidentsLoaded.</summary>
+    public int RulesWithIncidents { get; set; }
+
+    /// <summary>Rules per severity: High, Medium, Low, Informational, then any other value.</summary>
+    public List<RuleSeverityCount> SeverityCounts { get; set; } = new();
 
     /// <summary>False while only the rule list is loaded and incident counts are still being read.</summary>
     public bool IncidentsLoaded { get; set; }

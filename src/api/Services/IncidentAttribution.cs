@@ -72,6 +72,10 @@ public static class IncidentAttribution
         {
             LastRefreshed = DateTime.UtcNow,
             TotalRules = rules.Count,
+            EnabledRules = rules.Count(r => r.Enabled),
+            DisabledRules = rules.Count(r => !r.Enabled),
+            RulesWithIncidents = stats.Count(s => s.IncidentCount > 0),
+            SeverityCounts = SeverityCounts(rules),
             IncidentsLoaded = incidentsLoaded,
             TotalIncidents = totalIncidents,
             IncidentsFromExistingRules = stats.Sum(s => s.IncidentCount),
@@ -92,6 +96,29 @@ public static class IncidentAttribution
                 .Take(20)
                 .ToList(),
         };
+    }
+
+    private static readonly string[] SeverityOrder = ["High", "Medium", "Low", "Informational"];
+
+    /// <summary>Rules per severity over all rules, in the order High, Medium, Low, Informational, others.</summary>
+    public static List<RuleSeverityCount> SeverityCounts(
+        IReadOnlyList<(string Id, string Name, string Severity, bool Enabled)> rules) =>
+        rules
+            .GroupBy(r => r.Severity, StringComparer.OrdinalIgnoreCase)
+            .Select(g => new RuleSeverityCount
+            {
+                Severity = g.Key,
+                Total = g.Count(),
+                Enabled = g.Count(r => r.Enabled),
+            })
+            .OrderBy(c => SeverityRank(c.Severity))
+            .ThenBy(c => c.Severity, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+    private static int SeverityRank(string severity)
+    {
+        var index = Array.FindIndex(SeverityOrder, s => s.Equals(severity, StringComparison.OrdinalIgnoreCase));
+        return index >= 0 ? index : SeverityOrder.Length;
     }
 
     /// <summary>Rule key: last segment of a rule resource ID (or the ID itself), lowercase.</summary>
