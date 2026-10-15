@@ -28,6 +28,7 @@ public class DataCollectionRuleService
         IReadOnlyDictionary<string, string> tableTiers)
     {
         var response = new DcrResponse { LastChecked = DateTime.UtcNow };
+        var now = response.LastChecked;
 
         try
         {
@@ -50,12 +51,11 @@ public class DataCollectionRuleService
                     if (props.TryGetProperty("dataSources", out var dataSources))
                         ExtractDataSources(dataSources, dcrStatus);
 
-                    if (props.TryGetProperty("destinations", out var destinations) &&
-                        props.TryGetProperty("dataFlows",    out var dataFlows))
-                        ExtractDestinations(destinations, dataFlows, dcrStatus, lastLogPerTable, tableTiers);
+                    dcrStatus.Destinations = BuildDestinations(props, workspace.ResourceId, lastLogPerTable, tableTiers, now);
                 }
 
                 DetermineStatus(dcrStatus);
+                LogTablesWithoutDataOnce(workspace, dcrStatus);
                 response.DataCollectionRules.Add(dcrStatus);
             }
 
@@ -64,12 +64,29 @@ public class DataCollectionRuleService
             response.WarningCount = response.DataCollectionRules.Count(d => d.Status == "Warning");
             response.ErrorCount   = response.DataCollectionRules.Count(d => d.Status == "Error");
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is not OperationCanceledException)
         {
             _logger.LogError(ex, "Failed to get DCR status");
         }
 
         return response;
+    }
+
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<string, byte> _loggedEmptyTables = new();
+
+    /// <summary>
+    /// Logs once per DCR and table when a destination table in this workspace had no data in the
+    /// last 24 hours, so an operator can see which table makes a DCR show Error.
+    /// </summary>
+    private void LogTablesWithoutDataOnce(WorkspaceContext workspace, DcrStatus dcr)
+    {
+        foreach (var d in dcr.Destinations.Where(d =>
+                     d.Destination == ThisWorkspace && d.Tier != TableTiers.DataLake && !d.IsReceivingData))
+        {
+            if (_loggedEmptyTables.TryAdd($"{workspace.Key}|{dcr.DcrId}|{d.TableName}", 0))
+                _logger.LogInformation("DCR {Dcr}: destination table {Table} has no data in the last 24 hours",
+                    dcr.DcrName, d.TableName);
+        }
     }
 
     // ── Data source extraction ────────────────────────────────────────────────
@@ -95,61 +112,71 @@ public class DataCollectionRuleService
 
     // ── Destination + data flow extraction ───────────────────────────────────
 
-    private static void ExtractDestinations(
-        JsonElement destinations,
-        JsonElement dataFlows,
-        DcrStatus dcrStatus,
-        Dictionary<string, DateTime?> lastLogPerTable,
-        IReadOnlyDictionary<string, string> tableTiers)
+    public const string ThisWorkspace = "ThisWorkspace";
+    public const string OtherWorkspace = "OtherWorkspace";
+
+    /// <summary>
+    /// Builds the Log Analytics destinations of a DCR from its properties. Each data flow writes
+    /// to its outputStream when set, otherwise to its input streams. Freshness can only be checked
+    /// for tables in the selected workspace; destinations in other workspaces are only labeled.
+    /// </summary>
+    public static List<DcrDestination> BuildDestinations(
+        JsonElement properties,
+        string workspaceResourceId,
+        IReadOnlyDictionary<string, DateTime?> lastLogPerTable,
+        IReadOnlyDictionary<string, string> tableTiers,
+        DateTime utcNow)
     {
-        if (!destinations.TryGetProperty("logAnalytics", out var logAnalytics))
-            return;
+        var result = new List<DcrDestination>();
+        if (!properties.TryGetProperty("destinations", out var destinations) ||
+            !destinations.TryGetProperty("logAnalytics", out var logAnalytics) ||
+            !properties.TryGetProperty("dataFlows", out var dataFlows))
+            return result;
 
         foreach (var dest in logAnalytics.EnumerateArray())
         {
-            var destName    = dest.TryGetProperty("name",                out var dn)  ? dn.GetString()  ?? "" : "";
-            var workspaceId = dest.TryGetProperty("workspaceResourceId", out var wId) ? wId.GetString() ?? "" : "";
+            var destName = dest.TryGetProperty("name", out var dn) ? dn.GetString() ?? "" : "";
+            var destWorkspace = dest.TryGetProperty("workspaceResourceId", out var wId) ? wId.GetString() ?? "" : "";
+            var isThisWorkspace = string.Equals(
+                destWorkspace.Trim().TrimEnd('/'), workspaceResourceId, StringComparison.OrdinalIgnoreCase);
 
             var tables = new List<string>();
-
             foreach (var flow in dataFlows.EnumerateArray())
             {
                 if (!FlowTargetsDest(flow, destName)) continue;
 
-                if (flow.TryGetProperty("streams", out var streams))
-                    foreach (var stream in streams.EnumerateArray())
-                    {
-                        var tableName = MapStreamToTable(stream.GetString() ?? "");
-                        if (!string.IsNullOrEmpty(tableName))
-                            tables.Add(tableName);
-                    }
-
-                if (flow.TryGetProperty("outputStream", out var outputStream))
+                if (flow.TryGetProperty("outputStream", out var outputStream) &&
+                    !string.IsNullOrEmpty(outputStream.GetString()))
                 {
-                    var os = outputStream.GetString();
-                    if (!string.IsNullOrEmpty(os)) tables.Add(os);
+                    tables.Add(MapStreamToTable(outputStream.GetString()!));
+                }
+                else if (flow.TryGetProperty("streams", out var streams))
+                {
+                    foreach (var stream in streams.EnumerateArray())
+                        tables.Add(MapStreamToTable(stream.GetString() ?? ""));
                 }
             }
 
-            foreach (var table in tables.Distinct().Where(t => !string.IsNullOrEmpty(t)))
+            foreach (var table in tables.Where(t => t.Length > 0).Distinct(StringComparer.OrdinalIgnoreCase))
             {
                 var destination = new DcrDestination
                 {
                     TableName   = table,
-                    WorkspaceId = workspaceId,
-                    Tier        = TableTiers.Of(tableTiers, table)
+                    Destination = isThisWorkspace ? ThisWorkspace : OtherWorkspace,
+                    Tier        = isThisWorkspace ? TableTiers.Of(tableTiers, table) : TableTiers.Unknown
                 };
 
-                if (lastLogPerTable.TryGetValue(table, out var lastLog))
+                if (isThisWorkspace && lastLogPerTable.TryGetValue(table, out var lastLog) && lastLog.HasValue)
                 {
                     destination.LastLogReceived = lastLog;
-                    destination.IsReceivingData = lastLog.HasValue &&
-                        (DateTime.UtcNow - lastLog.Value).TotalHours < 24;
+                    destination.IsReceivingData = (utcNow - lastLog.Value).TotalHours < 24;
                 }
 
-                dcrStatus.Destinations.Add(destination);
+                result.Add(destination);
             }
         }
+
+        return result;
     }
 
     private static bool FlowTargetsDest(JsonElement flow, string destName)
@@ -163,17 +190,23 @@ public class DataCollectionRuleService
     // ── Status determination ──────────────────────────────────────────────────
 
     /// <summary>
-    /// Status from the destinations whose tables can be queried. Destinations in the data lake
-    /// tier are left out, because their last log time can't be read.
+    /// Status from the destinations whose tables can be queried: tables in the selected workspace
+    /// that are not in the data lake tier. Other destinations are left out.
     /// </summary>
     public static void DetermineStatus(DcrStatus dcrStatus)
     {
-        var checkable = dcrStatus.Destinations.Where(d => d.Tier != TableTiers.DataLake).ToList();
+        var inWorkspace = dcrStatus.Destinations.Where(d => d.Destination == ThisWorkspace).ToList();
+        var checkable = inWorkspace.Where(d => d.Tier != TableTiers.DataLake).ToList();
 
         if (dcrStatus.Destinations.Count == 0)
         {
             dcrStatus.Status       = "Unknown";
             dcrStatus.ErrorMessage = "No destinations configured or detected";
+        }
+        else if (inWorkspace.Count == 0)
+        {
+            dcrStatus.Status       = "Unknown";
+            dcrStatus.ErrorMessage = "All destinations are in another workspace, so data flow can't be checked from this workspace";
         }
         else if (checkable.Count == 0)
         {
@@ -205,18 +238,17 @@ public class DataCollectionRuleService
 
     // ── Stream-to-table mapping ───────────────────────────────────────────────
 
-    private static string MapStreamToTable(string streamName) => streamName switch
+    /// <summary>
+    /// Maps a DCR stream to its destination table: "Microsoft-Table-SecurityEvent" and
+    /// "Microsoft-SecurityEvent" to SecurityEvent, "Custom-MyTable_CL" to MyTable_CL.
+    /// </summary>
+    public static string MapStreamToTable(string streamName)
     {
-        "Microsoft-WindowsEvent"      => "WindowsEvent",
-        "Microsoft-SecurityEvent"     => "SecurityEvent",
-        "Microsoft-Syslog"            => "Syslog",
-        "Microsoft-CommonSecurityLog" => "CommonSecurityLog",
-        "Microsoft-Perf"              => "Perf",
-        "Microsoft-Event"             => "Event",
-        "Microsoft-Heartbeat"         => "Heartbeat",
-        "Microsoft-InsightsMetrics"   => "InsightsMetrics",
-        _ when streamName.StartsWith("Custom-") =>
-            streamName.Replace("Custom-", "").Replace("_CL", "") + "_CL",
-        _ => streamName
-    };
+        foreach (var prefix in new[] { "Microsoft-Table-", "Custom-", "Microsoft-" })
+        {
+            if (streamName.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+                return streamName[prefix.Length..];
+        }
+        return streamName;
+    }
 }

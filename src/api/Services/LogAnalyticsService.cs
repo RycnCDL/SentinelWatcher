@@ -264,6 +264,33 @@ public class LogAnalyticsService
             _logger.LogWarning(ex, "Last log query failed for workspace {Workspace}", workspace.WorkspaceName);
         }
 
+        // Tables outside the fixed list, for example DCR destinations such as Perf or custom _CL
+        // tables: freshness from the Usage table. Usage is aggregated per hour, so these times
+        // are approximate (at most about an hour late or early).
+        try
+        {
+            const string usageKql = @"
+                Usage
+                | where TimeGenerated > ago(24h)
+                | summarize LastLog = max(EndTime) by DataType
+            ";
+            var usage = (await _logsClient.QueryResourceAsync(
+                workspace.ResourceIdentifier, usageKql, LogsQueryTimeRange.All)).Value;
+
+            var now = DateTime.UtcNow;
+            foreach (var row in usage.Table.Rows)
+            {
+                var tableName = row.GetString("DataType") ?? "";
+                var lastLog   = row.GetDateTimeOffset("LastLog")?.UtcDateTime;
+                if (string.IsNullOrEmpty(tableName) || !lastLog.HasValue || result.ContainsKey(tableName)) continue;
+                result[tableName] = lastLog.Value > now ? now : lastLog.Value;
+            }
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            _logger.LogWarning(ex, "Usage freshness query failed for workspace {Workspace}", workspace.WorkspaceName);
+        }
+
         return result;
     }
 

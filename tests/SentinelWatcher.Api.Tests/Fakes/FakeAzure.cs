@@ -49,7 +49,8 @@ public static class LogsResults
         var cols = columns.Select(c => LogsQueryModelFactory.LogsTableColumn(c.Name, c.Type)).ToList();
         var tableRows = (rows ?? Array.Empty<object?[]>()).Select(r => LogsQueryModelFactory.LogsTableRow(cols, r)).ToList();
         var table = LogsQueryModelFactory.LogsTable("PrimaryResult", cols, tableRows);
-        var error = partialError is null ? null : BinaryData.FromString(partialError);
+        // The factory needs a value for every BinaryData argument; JSON null means "no error".
+        var error = BinaryData.FromString(partialError ?? "null");
         // Named arguments: the parameter order differs between the XML docs and the assembly.
         return LogsQueryModelFactory.LogsQueryResult(
             allTables: new[] { table },

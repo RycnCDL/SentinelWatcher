@@ -56,7 +56,7 @@ public class PartialQueryErrorTests
         Assert.True(logs.Entries.Any(e => e.Message.Contains("InsiderRiskEvents")), string.Join(Environment.NewLine, logs.Entries));
         var entry = Assert.Single(logs.Entries, e => e.Message.Contains("InsiderRiskEvents"));
         Assert.Equal(LogLevel.Information, entry.Level);
-        Assert.DoesNotContain(logs.Entries, e => e.Level >= LogLevel.Warning);
+        Assert.True(!logs.Entries.Any(e => e.Level >= LogLevel.Warning), string.Join(Environment.NewLine, logs.Entries));
     }
 
     private static (LogAnalyticsService Service, ListLoggerProvider Logs) CreateService(FakeLogsQueryClient client)

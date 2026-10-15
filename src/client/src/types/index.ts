@@ -61,7 +61,8 @@ export interface DataConnectorsResponse {
 
 export interface DcrDestination {
   tableName: string;
-  workspaceId: string;
+  // Only checked when the table is in the selected workspace.
+  destination: 'ThisWorkspace' | 'OtherWorkspace';
   lastLogReceived: string | null;
   isReceivingData: boolean;
   tier: TableTier;

@@ -103,8 +103,9 @@ export default function DataCollectionRules() {
             {data.dataCollectionRules.map((dcr) => {
               const Icon = STATUS_ICON[dcr.status];
               const isExpanded = expanded === dcr.dcrId;
-              const onlyDataLake =
-                dcr.destinations.length > 0 && dcr.destinations.every((d) => d.tier === 'DataLake');
+              const inWorkspace = dcr.destinations.filter((d) => d.destination === 'ThisWorkspace');
+              const onlyOtherWorkspaces = dcr.destinations.length > 0 && inWorkspace.length === 0;
+              const onlyDataLake = inWorkspace.length > 0 && inWorkspace.every((d) => d.tier === 'DataLake');
               return (
                 <>
                   <tr key={dcr.dcrId}>
@@ -118,9 +119,11 @@ export default function DataCollectionRules() {
                     <td>
                       {dcr.lastDataReceived
                         ? new Date(dcr.lastDataReceived).toLocaleString()
-                        : onlyDataLake
-                          ? 'Not available in data lake tier'
-                          : 'No data'}
+                        : onlyOtherWorkspaces
+                          ? 'Other workspace'
+                          : onlyDataLake
+                            ? 'Not available in data lake tier'
+                            : 'No data'}
                     </td>
                     <td>
                       <button
@@ -162,7 +165,11 @@ export default function DataCollectionRules() {
                                   <span className="dest-table">
                                     {dest.tableName}
                                   </span>
-                                  {dest.tier === 'DataLake' ? (
+                                  {dest.destination === 'OtherWorkspace' ? (
+                                    <span className="dest-status unavailable">
+                                      Other workspace, not checked
+                                    </span>
+                                  ) : dest.tier === 'DataLake' ? (
                                     <span className="dest-status unavailable">
                                       Not available in data lake tier
                                     </span>

@@ -15,7 +15,13 @@ public class DcrStatus
 public class DcrDestination
 {
     public string TableName { get; set; } = string.Empty;
-    public string WorkspaceId { get; set; } = string.Empty;
+
+    /// <summary>
+    /// ThisWorkspace or OtherWorkspace. Resource IDs of other workspaces are not sent to the
+    /// browser, and their tables can't be checked from the selected workspace.
+    /// </summary>
+    public string Destination { get; set; } = "ThisWorkspace";
+
     public DateTime? LastLogReceived { get; set; }
     public bool IsReceivingData { get; set; }
 
