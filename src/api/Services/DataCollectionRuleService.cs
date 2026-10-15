@@ -22,7 +22,10 @@ public class DataCollectionRuleService
     /// Lists the data collection rules in the workspace resource group. DCRs in other
     /// resource groups are not included (known limitation).
     /// </summary>
-    public async Task<DcrResponse> GetDcrStatusAsync(WorkspaceContext workspace, Dictionary<string, DateTime?> lastLogPerTable)
+    public async Task<DcrResponse> GetDcrStatusAsync(
+        WorkspaceContext workspace,
+        Dictionary<string, DateTime?> lastLogPerTable,
+        IReadOnlyDictionary<string, string> tableTiers)
     {
         var response = new DcrResponse { LastChecked = DateTime.UtcNow };
 
@@ -49,7 +52,7 @@ public class DataCollectionRuleService
 
                     if (props.TryGetProperty("destinations", out var destinations) &&
                         props.TryGetProperty("dataFlows",    out var dataFlows))
-                        ExtractDestinations(destinations, dataFlows, dcrStatus, lastLogPerTable);
+                        ExtractDestinations(destinations, dataFlows, dcrStatus, lastLogPerTable, tableTiers);
                 }
 
                 DetermineStatus(dcrStatus);
@@ -96,7 +99,8 @@ public class DataCollectionRuleService
         JsonElement destinations,
         JsonElement dataFlows,
         DcrStatus dcrStatus,
-        Dictionary<string, DateTime?> lastLogPerTable)
+        Dictionary<string, DateTime?> lastLogPerTable,
+        IReadOnlyDictionary<string, string> tableTiers)
     {
         if (!destinations.TryGetProperty("logAnalytics", out var logAnalytics))
             return;
@@ -132,7 +136,8 @@ public class DataCollectionRuleService
                 var destination = new DcrDestination
                 {
                     TableName   = table,
-                    WorkspaceId = workspaceId
+                    WorkspaceId = workspaceId,
+                    Tier        = TableTiers.Of(tableTiers, table)
                 };
 
                 if (lastLogPerTable.TryGetValue(table, out var lastLog))
@@ -157,25 +162,37 @@ public class DataCollectionRuleService
 
     // ── Status determination ──────────────────────────────────────────────────
 
-    private static void DetermineStatus(DcrStatus dcrStatus)
+    /// <summary>
+    /// Status from the destinations whose tables can be queried. Destinations in the data lake
+    /// tier are left out, because their last log time can't be read.
+    /// </summary>
+    public static void DetermineStatus(DcrStatus dcrStatus)
     {
+        var checkable = dcrStatus.Destinations.Where(d => d.Tier != TableTiers.DataLake).ToList();
+
         if (dcrStatus.Destinations.Count == 0)
         {
             dcrStatus.Status       = "Unknown";
             dcrStatus.ErrorMessage = "No destinations configured or detected";
         }
-        else if (dcrStatus.Destinations.All(d => d.IsReceivingData))
+        else if (checkable.Count == 0)
+        {
+            dcrStatus.Status       = "Unknown";
+            dcrStatus.ErrorMessage = "Not available in data lake tier: all destination tables are in the data lake tier, " +
+                                     "so data flow can't be checked through the Log Analytics query API";
+        }
+        else if (checkable.All(d => d.IsReceivingData))
         {
             dcrStatus.Status           = "Healthy";
-            dcrStatus.LastDataReceived = dcrStatus.Destinations
+            dcrStatus.LastDataReceived = checkable
                 .Where(d => d.LastLogReceived.HasValue)
                 .Max(d => d.LastLogReceived);
         }
-        else if (dcrStatus.Destinations.Any(d => d.IsReceivingData))
+        else if (checkable.Any(d => d.IsReceivingData))
         {
             dcrStatus.Status           = "Warning";
             dcrStatus.ErrorMessage     = "Some destinations not receiving data";
-            dcrStatus.LastDataReceived = dcrStatus.Destinations
+            dcrStatus.LastDataReceived = checkable
                 .Where(d => d.LastLogReceived.HasValue)
                 .Max(d => d.LastLogReceived);
         }

@@ -103,6 +103,8 @@ export default function DataCollectionRules() {
             {data.dataCollectionRules.map((dcr) => {
               const Icon = STATUS_ICON[dcr.status];
               const isExpanded = expanded === dcr.dcrId;
+              const onlyDataLake =
+                dcr.destinations.length > 0 && dcr.destinations.every((d) => d.tier === 'DataLake');
               return (
                 <>
                   <tr key={dcr.dcrId}>
@@ -116,7 +118,9 @@ export default function DataCollectionRules() {
                     <td>
                       {dcr.lastDataReceived
                         ? new Date(dcr.lastDataReceived).toLocaleString()
-                        : 'No data'}
+                        : onlyDataLake
+                          ? 'Not available in data lake tier'
+                          : 'No data'}
                     </td>
                     <td>
                       <button
@@ -158,13 +162,19 @@ export default function DataCollectionRules() {
                                   <span className="dest-table">
                                     {dest.tableName}
                                   </span>
-                                  <span
-                                    className={`dest-status ${dest.isReceivingData ? 'receiving' : 'not-receiving'}`}
-                                  >
-                                    {dest.isReceivingData
-                                      ? 'Receiving'
-                                      : 'Not receiving'}
-                                  </span>
+                                  {dest.tier === 'DataLake' ? (
+                                    <span className="dest-status unavailable">
+                                      Not available in data lake tier
+                                    </span>
+                                  ) : (
+                                    <span
+                                      className={`dest-status ${dest.isReceivingData ? 'receiving' : 'not-receiving'}`}
+                                    >
+                                      {dest.isReceivingData
+                                        ? 'Receiving'
+                                        : 'Not receiving'}
+                                    </span>
+                                  )}
                                   {dest.lastLogReceived && (
                                     <span className="dest-last">
                                       Last:{' '}

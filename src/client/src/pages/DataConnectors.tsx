@@ -39,6 +39,9 @@ const STATUS_CONFIG = {
 function ConnectorCard({ connector }: { connector: ConnectorHealth }) {
   const config = STATUS_CONFIG[connector.status];
   const Icon = config.icon;
+  const dataLake = new Set(connector.dataLakeTables);
+  const onlyDataLake =
+    connector.associatedTables.length > 0 && connector.dataLakeTables.length === connector.associatedTables.length;
 
   return (
     <div className="connector-card" style={{ borderColor: config.color }}>
@@ -61,7 +64,9 @@ function ConnectorCard({ connector }: { connector: ConnectorHealth }) {
           <span className="detail-label">Tables:</span>
           <span>
             {connector.associatedTables.length > 0
-              ? connector.associatedTables.join(', ')
+              ? connector.associatedTables
+                  .map((t) => (dataLake.has(t) ? `${t} (data lake tier)` : t))
+                  .join(', ')
               : 'N/A'}
           </span>
         </div>
@@ -70,7 +75,9 @@ function ConnectorCard({ connector }: { connector: ConnectorHealth }) {
           <span>
             {connector.lastLogReceived
               ? new Date(connector.lastLogReceived).toLocaleString()
-              : 'No data'}
+              : onlyDataLake
+                ? 'Not available in data lake tier'
+                : 'No data'}
           </span>
         </div>
         {connector.gapMinutes != null && (

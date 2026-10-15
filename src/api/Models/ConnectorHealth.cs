@@ -10,6 +10,12 @@ public class ConnectorHealth
     public double? GapMinutes { get; set; }
     public string? ErrorMessage { get; set; }
     public List<string> AssociatedTables { get; set; } = new();
+
+    /// <summary>
+    /// Associated tables in the data lake tier. Their last log time can't be read through the
+    /// Log Analytics query API.
+    /// </summary>
+    public List<string> DataLakeTables { get; set; } = new();
 }
 
 public class DataConnectorsResponse

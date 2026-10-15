@@ -47,6 +47,7 @@ builder.Services.AddSingleton<IWorkspaceStatusProvider, SentinelStatusProvider>(
 builder.Services.AddSingleton<SentinelService>();
 builder.Services.AddSingleton<LogAnalyticsService>();
 builder.Services.AddSingleton<DataCollectionRuleService>();
+builder.Services.AddSingleton<TableTierService>();
 builder.Services.AddSingleton<WorkspaceService>();
 
 // Per-workspace cache, shared by all viewers (everyone sees data read by the same identity).

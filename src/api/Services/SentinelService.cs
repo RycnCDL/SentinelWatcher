@@ -150,7 +150,10 @@ public class SentinelService
         return rules;
     }
 
-    public async Task<DataConnectorsResponse> GetDataConnectorsAsync(WorkspaceContext workspace, Dictionary<string, DateTime?> lastLogPerTable)
+    public async Task<DataConnectorsResponse> GetDataConnectorsAsync(
+        WorkspaceContext workspace,
+        Dictionary<string, DateTime?> lastLogPerTable,
+        IReadOnlyDictionary<string, string> tableTiers)
     {
         var response = new DataConnectorsResponse
         {
@@ -250,34 +253,10 @@ public class SentinelService
             }
 
             // Calculate health status
+            var now = DateTime.UtcNow;
             foreach (var health in connectorGroups.Values)
             {
-                if (health.LastLogReceived.HasValue)
-                {
-                    var gap = (DateTime.UtcNow - health.LastLogReceived.Value).TotalMinutes;
-                    health.GapMinutes = Math.Round(gap, 1);
-
-                    if (gap <= _cacheConfig.ConnectorGapThresholdMinutes)
-                        health.Status = "Healthy";
-                    else if (gap <= _cacheConfig.ConnectorGapThresholdMinutes * 2)
-                    {
-                        health.Status = "Warning";
-                        health.ErrorMessage = $"No logs received for {Math.Round(gap)} minutes";
-                    }
-                    else
-                    {
-                        health.Status = "Error";
-                        health.ErrorMessage = $"No logs received for {Math.Round(gap)} minutes";
-                    }
-                }
-                else
-                {
-                    health.Status = health.AssociatedTables.Count > 0 ? "Error" : "Unknown";
-                    health.ErrorMessage = health.AssociatedTables.Count > 0
-                        ? "No logs received in the last 24 hours"
-                        : "No associated tables identified";
-                }
-
+                ApplyHealthStatus(health, tableTiers, _cacheConfig.ConnectorGapThresholdMinutes, now);
                 response.Connectors.Add(health);
             }
 
@@ -295,6 +274,53 @@ public class SentinelService
         }
 
         return response;
+    }
+
+    public const string DataLakeMessage =
+        "Not available in data lake tier: last log times can't be read through the Log Analytics query API";
+
+    /// <summary>
+    /// Sets Status, GapMinutes and ErrorMessage from the last log time. A connector whose tables
+    /// are all in the data lake tier is Unknown, because its last log time can't be read.
+    /// </summary>
+    public static void ApplyHealthStatus(
+        ConnectorHealth health, IReadOnlyDictionary<string, string> tableTiers, int gapThresholdMinutes, DateTime utcNow)
+    {
+        health.DataLakeTables = health.AssociatedTables.Where(t => TableTiers.IsDataLake(tableTiers, t)).ToList();
+
+        if (health.LastLogReceived.HasValue)
+        {
+            var gap = (utcNow - health.LastLogReceived.Value).TotalMinutes;
+            health.GapMinutes = Math.Round(gap, 1);
+
+            if (gap <= gapThresholdMinutes)
+                health.Status = "Healthy";
+            else if (gap <= gapThresholdMinutes * 2)
+            {
+                health.Status = "Warning";
+                health.ErrorMessage = $"No logs received for {Math.Round(gap)} minutes";
+            }
+            else
+            {
+                health.Status = "Error";
+                health.ErrorMessage = $"No logs received for {Math.Round(gap)} minutes";
+            }
+        }
+        else if (health.AssociatedTables.Count == 0)
+        {
+            health.Status = "Unknown";
+            health.ErrorMessage = "No associated tables identified";
+        }
+        else if (health.DataLakeTables.Count == health.AssociatedTables.Count)
+        {
+            health.Status = "Unknown";
+            health.ErrorMessage = DataLakeMessage;
+        }
+        else
+        {
+            health.Status = "Error";
+            health.ErrorMessage = "No logs received in the last 24 hours";
+        }
     }
 
     /// <summary>Connector that writes to the given table, if the table is known.</summary>

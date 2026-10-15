@@ -246,6 +246,14 @@ export default function Ingestion() {
                           estimated
                         </span>
                       )}
+                      {t.tier === 'DataLake' && (
+                        <span
+                          className="badge badge--low badge--inline"
+                          title="Data lake tier table. The cost estimate uses the analytics tier price per GB and does not reflect data lake pricing."
+                        >
+                          data lake tier
+                        </span>
+                      )}
                     </td>
                     <td className="text-right">{t.volumeMB.toLocaleString()}</td>
                     <td className="text-right">{t.volumeGB.toFixed(2)}</td>

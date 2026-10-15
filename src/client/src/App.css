@@ -722,6 +722,10 @@ nav {
   color: var(--danger);
 }
 
+.dest-status.unavailable {
+  color: var(--text-muted);
+}
+
 .dest-last {
   color: var(--text-muted);
   font-size: 0.72rem;

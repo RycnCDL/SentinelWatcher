@@ -23,7 +23,12 @@ export interface TableIngestion {
   dailyAverageMB: number;
   // No Usage data for this table: volume is estimated from the record count (1 KB per record).
   isEstimated: boolean;
+  tier: TableTier;
 }
+
+// Storage tier of a workspace table. Data lake tier tables can't be read through the
+// Log Analytics query API, so their last log time is "not available", not "no data".
+export type TableTier = 'Analytics' | 'Basic' | 'DataLake' | 'Unknown';
 
 export interface IngestionResponse {
   tables: TableIngestion[];
@@ -43,6 +48,7 @@ export interface ConnectorHealth {
   gapMinutes: number | null;
   errorMessage: string | null;
   associatedTables: string[];
+  dataLakeTables: string[];
 }
 
 export interface DataConnectorsResponse {
@@ -58,6 +64,7 @@ export interface DcrDestination {
   workspaceId: string;
   lastLogReceived: string | null;
   isReceivingData: boolean;
+  tier: TableTier;
 }
 
 export interface DcrStatus {

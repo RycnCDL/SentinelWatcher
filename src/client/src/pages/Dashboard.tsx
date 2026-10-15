@@ -344,7 +344,7 @@ export default function Dashboard() {
                   <div key={r.dcrId} style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', padding: '0.4rem 0.6rem', borderRadius: 8, background: 'var(--surface-sunken)', fontSize: '0.8rem' }}>
                     <span style={{
                       width: 6, height: 6, borderRadius: '50%', flexShrink: 0,
-                      background: r.status === 'Healthy' ? 'var(--healthy)' : r.status === 'Warning' ? 'var(--warning)' : 'var(--danger)',
+                      background: r.status === 'Healthy' ? 'var(--healthy)' : r.status === 'Warning' ? 'var(--warning)' : r.status === 'Error' ? 'var(--danger)' : 'var(--text-muted)',
                     }} />
                     <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: 'var(--text-secondary)' }} title={r.dcrName}>{r.dcrName}</span>
                     <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', flexShrink: 0 }}>{r.destinations?.length ?? 0} dest</span>

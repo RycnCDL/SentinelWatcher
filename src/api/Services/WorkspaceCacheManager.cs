@@ -20,6 +20,7 @@ public class WorkspaceCacheManager
     private readonly ConcurrentDictionary<string, WorkspaceCacheEntry> _caches = new();
     private readonly SentinelService _sentinelService;
     private readonly LogAnalyticsService _logAnalyticsService;
+    private readonly TableTierService _tableTierService;
     private readonly ILogger<WorkspaceCacheManager> _logger;
     private readonly int _refreshMinutes;
     private readonly int _evictMinutes;
@@ -29,11 +30,13 @@ public class WorkspaceCacheManager
     public WorkspaceCacheManager(
         SentinelService sentinelService,
         LogAnalyticsService logAnalyticsService,
+        TableTierService tableTierService,
         IOptions<CacheSettingsConfig> cacheConfig,
         ILogger<WorkspaceCacheManager> logger)
     {
         _sentinelService = sentinelService;
         _logAnalyticsService = logAnalyticsService;
+        _tableTierService = tableTierService;
         _logger = logger;
         _refreshMinutes = cacheConfig.Value.HeavyQueryRefreshMinutes;
         _evictMinutes = cacheConfig.Value.EvictAfterMinutes;
@@ -117,8 +120,10 @@ public class WorkspaceCacheManager
             var rulesTask    = _sentinelService.GetAnalyticsRulesAsync(workspace);
             var ingestionTask = _logAnalyticsService.GetIngestionStatsAsync(workspace);
             var lastLogTask  = _logAnalyticsService.GetLastLogPerTableAsync(workspace);
+            var tiersTask    = _tableTierService.GetTiersAsync(workspace);
 
-            await Task.WhenAll(rulesTask, ingestionTask, lastLogTask);
+            await Task.WhenAll(rulesTask, ingestionTask, lastLogTask, tiersTask);
+            var tiers = tiersTask.Result;
 
             // Store partial results immediately after Phase 1 to unblock the frontend.
             // Analytics: rule list from ARM (name, severity, enabled) with 0 incident counts.
@@ -139,8 +144,12 @@ public class WorkspaceCacheManager
                     }).ToList(),
                 Top20LeastIncidents = new List<AnalyticsRuleStats>()
             };
-            entry.Ingestion  = ingestionTask.Result;
-            entry.Connectors = await _sentinelService.GetDataConnectorsAsync(workspace, lastLogTask.Result);
+            var ingestion = ingestionTask.Result;
+            foreach (var table in ingestion.Tables)
+                table.Tier = TableTiers.Of(tiers, table.TableName);
+
+            entry.Ingestion  = ingestion;
+            entry.Connectors = await _sentinelService.GetDataConnectorsAsync(workspace, lastLogTask.Result, tiers);
 
             _logger.LogInformation("Phase 1 complete for workspace {Id} in {Ms}ms: data now available to frontend",
                 workspaceId, sw.ElapsedMilliseconds);

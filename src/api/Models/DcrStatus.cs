@@ -18,6 +18,9 @@ public class DcrDestination
     public string WorkspaceId { get; set; } = string.Empty;
     public DateTime? LastLogReceived { get; set; }
     public bool IsReceivingData { get; set; }
+
+    /// <summary>Tier of the destination table: Analytics, Basic, DataLake or Unknown.</summary>
+    public string Tier { get; set; } = "Unknown";
 }
 
 public class DcrResponse

@@ -13,6 +13,9 @@ public class TableIngestion
     /// count (1 KB per record) instead of measured.
     /// </summary>
     public bool IsEstimated { get; set; }
+
+    /// <summary>Tier of the table: Analytics, Basic, DataLake or Unknown.</summary>
+    public string Tier { get; set; } = "Unknown";
 }
 
 public class IngestionResponse
