@@ -73,8 +73,10 @@ public class SentinelService
         { "Syslog", ("Syslog", "Syslog") },
         { "CommonSecurityLog", ("Common Event Format (CEF)", "CommonEventFormat") },
 
-        // Threat Intelligence
+        // Threat Intelligence: the legacy table plus the tables that replace it in migrated workspaces
         { "ThreatIntelligenceIndicator", ("Threat Intelligence", "ThreatIntelligence") },
+        { "ThreatIntelIndicators", ("Threat Intelligence", "ThreatIntelligence") },
+        { "ThreatIntelObjects", ("Threat Intelligence", "ThreatIntelligence") },
 
         // DNS
         { "DnsEvents", ("DNS", "DNS") },
@@ -288,7 +290,12 @@ public class SentinelService
         return response;
     }
 
-    private static List<string> MapConnectorKindToTables(string kind)
+    /// <summary>Connector that writes to the given table, if the table is known.</summary>
+    public static bool TryMapTableToConnector(string tableName, out (string ConnectorName, string ConnectorType) connector) =>
+        TableToConnectorMap.TryGetValue(tableName, out connector);
+
+    /// <summary>Tables written by an ARM data connector of the given kind.</summary>
+    public static List<string> MapConnectorKindToTables(string kind)
     {
         return kind switch
         {
@@ -296,7 +303,7 @@ public class SentinelService
             "AzureAdvancedThreatProtection" => new List<string> { "SecurityAlert" },
             "MicrosoftDefenderAdvancedThreatProtection" => new List<string> { "SecurityAlert", "DeviceEvents" },
             "Office365" => new List<string> { "OfficeActivity" },
-            "ThreatIntelligence" or "ThreatIntelligenceTaxii" => new List<string> { "ThreatIntelligenceIndicator" },
+            "ThreatIntelligence" or "ThreatIntelligenceTaxii" or "MicrosoftThreatIntelligence" => ThreatIntelTables(),
             "AmazonWebServicesCloudTrail" => new List<string> { "AWSCloudTrail" },
             "AmazonWebServicesS3" => new List<string> { "AWSCloudTrail", "AWSGuardDuty", "AWSVPCFlow" },
             "MicrosoftCloudAppSecurity" => new List<string> { "McasShadowItReporting", "SecurityAlert" },
@@ -305,10 +312,14 @@ public class SentinelService
             "SecurityEvents" or "WindowsSecurityEvents" => new List<string> { "SecurityEvent" },
             "AzureSecurityCenter" => new List<string> { "SecurityAlert" },
             "MicrosoftThreatProtection" => new List<string> { "DeviceEvents", "DeviceLogonEvents", "DeviceProcessEvents" },
-            "MicrosoftThreatIntelligence" => new List<string> { "ThreatIntelligenceIndicator" },
             "AzureActivity" => new List<string> { "AzureActivity" },
             "DNS" => new List<string> { "DnsEvents", "DnsInventory" },
             _ => new List<string>()
         };
     }
+
+    // Workspaces migrated to the new threat intelligence schema write ThreatIntelIndicators and
+    // ThreatIntelObjects instead of ThreatIntelligenceIndicator. Any of them counts as data.
+    private static List<string> ThreatIntelTables() =>
+        new() { "ThreatIntelligenceIndicator", "ThreatIntelIndicators", "ThreatIntelObjects" };
 }

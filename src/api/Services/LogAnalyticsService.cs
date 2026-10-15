@@ -218,7 +218,7 @@ public class LogAnalyticsService
         "SecurityAlert", "SecurityIncident",
         "OfficeActivity", "AzureActivity",
         "CommonSecurityLog", "Syslog",
-        "ThreatIntelligenceIndicator",
+        "ThreatIntelligenceIndicator", "ThreatIntelIndicators", "ThreatIntelObjects",
         "SecurityEvent", "WindowsEvent",
         "McasShadowItReporting",
         "SentinelHealth", "SentinelAudit",
