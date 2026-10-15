@@ -58,11 +58,11 @@ SentinelWatcher only uses **Azure Resource Manager** and the **Log Analytics que
 | Page | Data | Source |
 |------|------|--------|
 | Dashboard | Summary of the pages below | Cache |
-| Analytics Rules | Rules (name, severity, enabled); incidents created in the last 30 days, the latest row per incident, grouped by rule, or by provider for incidents without a rule | ARM `alertRules`; `SecurityIncident` |
+| Analytics Rules | Rules (name, severity, enabled) and counts over all rules; incidents created in the last 30 days, the latest row per incident, grouped by rule, or by provider for incidents without a rule | ARM `alertRules`; `SecurityIncident` |
 | Log Ingestion | Billable volume per table over 30 days; record counts for important tables that have no Usage data (estimated at 1 KB per record); table tier | `Usage`; `union` over a fixed table list; ARM `tables` |
 | Data Connectors (data freshness) | Newest record per table in the last 24 hours, grouped into connectors by table; extra connectors listed by ARM | `union` over a fixed table list and `Usage` (hourly) for other tables; ARM `dataConnectors`; ARM `tables` |
 | Collection Rules | DCRs in the workspace resource group, their data flows and destination tables, and whether those tables received data in the last 24 hours | ARM `dataCollectionRules`; the same freshness data as above |
-| Sentinel Health (connector health) | Health score, rule and automation runs (24 hours), failure trend, latest status per connector, recent failures, auto-disabled rules | `_SentinelHealth()` |
+| Sentinel Health (connector health) | Health score, rule and automation runs (24 hours), failure trend, latest status per connector, failures per resource type, the 50 newest failures, auto-disabled rules | `_SentinelHealth()` |
 
 "Data freshness" and "Connector health" answer different questions: freshness looks at whether data arrives in the tables; connector health is what Microsoft Sentinel itself reports in `SentinelHealth`.
 

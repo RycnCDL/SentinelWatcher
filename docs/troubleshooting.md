@@ -54,6 +54,7 @@ Failed sections are retried after 30 seconds (`CacheSettings:ErrorRetrySeconds`)
 | Connector shows Quiet | Event-driven connector without recent events | Not an error. Change the behavior per connector type, see [Connector health](configuration.md#connector-health) |
 | Connector on Sentinel Health shows Stale | No `SentinelHealth` event for it in the selected range. Sentinel logs connector events mainly on status changes and while failing, so a long-healthy connector can be stale. Old entries of removed or reconnected connectors are stale too. | Compare with the data freshness on the Data Connectors page |
 | Incident numbers differ from Advanced Hunting | SentinelWatcher counts each incident once (latest row per `IncidentName`) by `CreatedTime` in the last 30 days. Counting `SecurityIncident` rows counts updates. | Use the same definition, see the [FAQ](faq.md#why-do-incident-numbers-differ-from-my-own-query) |
+| Rule count is one higher than in the Defender portal | The Fusion rule. The Defender portal hides it in onboarded workspaces (Defender XDR correlation replaces it), the `alertRules` API still returns it. | Expected, see the [FAQ](faq.md#why-does-sentinelwatcher-show-one-more-rule-than-the-defender-portal) |
 | Log ingestion cost differs from the bill | The estimate uses one price per GB (`CacheSettings:CostPerGBDollars`) | Set your effective price. Commitment tiers, benefits and data lake pricing are not considered. |
 
 ## Deployment

@@ -38,6 +38,14 @@ SecurityIncident
 
 On the Analytics Rules page, every incident is assigned to an existing rule, a rule that no longer exists ("Rule deleted or not found"), or no analytics rule (for example "Defender XDR / no analytics rule"), so the numbers add up to the total. An incident that references several rules counts once per rule in that table.
 
+## Why does SentinelWatcher show one more rule than the Defender portal?
+
+Usually because of the **Fusion** rule (Advanced Multistage Attack Detection, rule kind `Fusion`). Microsoft documents that Fusion is turned off when a workspace is onboarded to the Defender portal, and that Defender XDR correlation replaces it. The Defender portal does not list the rule, but the Sentinel `alertRules` API still returns it; in the workspace tested for 0.1.0 it was returned as enabled.
+
+SentinelWatcher shows what the API returns, so it counts the Fusion rule in the rule total, the enabled count and the severity breakdown. In a Defender-onboarded workspace, read it as: **not used in the Defender portal, replaced by Defender XDR correlation**. SentinelWatcher does not mark the rule in the app, because Microsoft documents no API that tells whether a workspace is onboarded to the Defender portal.
+
+Rule counts and the severity breakdown always cover all rules. The "Top 20" lists on the Analytics Rules page show at most 20 rules each and say so when there are more.
+
 ## What is the difference between "Data freshness" and "Connector health"?
 
 **Data freshness** (Dashboard, Data Connectors page) checks whether data arrives: the newest record in each connector's tables. **Connector health** (Sentinel Health page) is what Microsoft Sentinel reports about its connectors in the `SentinelHealth` table. They can disagree: a connector can report success while its source sends nothing, or data can arrive while the health event is old.

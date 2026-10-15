@@ -13,7 +13,7 @@ First public release.
 ### Added
 
 - Dashboard with analytics rules, log ingestion, data freshness and data collection rule status for a Microsoft Sentinel workspace.
-- Analytics Rules page: incidents of the last 30 days per rule, and where every incident comes from (existing rule, deleted rule, or no analytics rule such as Microsoft Defender XDR incidents).
+- Analytics Rules page: rule counts and severities over all rules, incidents of the last 30 days per rule, and where every incident comes from (existing rule, deleted rule, or no analytics rule such as Microsoft Defender XDR incidents).
 - Log Ingestion page: billable volume and estimated cost per table over 30 days, with estimated volumes and data lake tier tables labeled.
 - Data Connectors page: data freshness per connector from the newest record in its tables, with configurable gap thresholds per connector type and a Quiet state for event-driven connectors.
 - Collection Rules page: data collection rules in the workspace resource group and whether their destination tables receive data. Can be turned off with `Sentinel:EnableDcrPage`.
@@ -35,6 +35,7 @@ First public release.
 ### Known issues
 
 - DCRs outside the workspace resource group are not shown.
+- The Fusion rule is counted even in workspaces onboarded to the Defender portal, where it is not used (Defender XDR correlation replaces it) and the portal does not list it. Onboarding can't be detected through a documented API, so the app does not mark the rule; see the FAQ.
 - Custom detection rules created in the Microsoft Defender portal are not shown. The Microsoft Graph API for them is still in beta.
 - Data lake tier tables are detected by the `Auxiliary` table plan, confirmed through the tables API but not yet in the Defender portal tier view. Their cost estimate uses the analytics tier price.
 - See the README for the full list.
