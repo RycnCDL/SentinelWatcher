@@ -109,22 +109,27 @@ public class LogAnalyticsService
 
         try
         {
-            // Primary: Usage table (fast, pre-aggregated by Azure)
+            // Primary: Usage table (fast, pre-aggregated by Azure). Only billable data
+            // (IsBillable == true) counts. Data types that appear in Usage only as free data,
+            // such as SecurityAlert, are remembered so they are not estimated below either.
             var kql = @"
                 Usage
                 | where TimeGenerated > ago(30d)
-                | summarize TotalVolumeMB = sum(Quantity) by DataType
+                | summarize TotalVolumeMB = sumif(Quantity, IsBillable == true) by DataType
                 | sort by TotalVolumeMB desc
             ";
 
             var result = await logsClient.QueryResourceAsync(workspace.ResourceIdentifier, kql, LogsQueryTimeRange.All);
 
+            var seenInUsage = new HashSet<string>();
             if (result.Value.Status == LogsQueryResultStatus.Success)
             {
                 foreach (var row in result.Value.Table.Rows)
                 {
                     var tableName = row.GetString("DataType") ?? "Unknown";
                     var volumeMB = row.GetDouble("TotalVolumeMB") ?? 0;
+                    seenInUsage.Add(tableName);
+                    if (volumeMB <= 0) continue; // free data only
                     var volumeGB = volumeMB / 1024;
                     var cost = volumeGB * _cacheConfig.CostPerGBDollars;
 
@@ -139,8 +144,7 @@ public class LogAnalyticsService
             }
 
             // Check important tables not found in Usage: single union query instead of N individual queries
-            var foundTables      = new HashSet<string>(response.Tables.Select(t => t.TableName));
-            var importantMissing = ImportantTables.Where(t => !foundTables.Contains(t)).ToArray();
+            var importantMissing = ImportantTables.Where(t => !seenInUsage.Contains(t)).ToArray();
 
             if (importantMissing.Length > 0)
             {
