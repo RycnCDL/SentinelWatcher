@@ -1,17 +1,19 @@
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, lazy, Suspense } from 'react';
 import AuthGuard from './auth/AuthGuard';
 import { WorkspaceProvider } from './auth/WorkspaceContext';
 import AccessGate from './auth/AccessGate';
 import Sidebar from './components/Sidebar';
-import Dashboard from './pages/Dashboard';
-import AnalyticsRules from './pages/AnalyticsRules';
-import Ingestion from './pages/Ingestion';
-import DataConnectors from './pages/DataConnectors';
-import DataCollectionRules from './pages/DataCollectionRules';
-import SentinelHealth from './pages/SentinelHealth';
 import { isDcrPageEnabled } from './config/runtimeConfig';
 import './App.css';
+
+// Pages are loaded on demand, so the first load only fetches the page that is opened.
+const Dashboard = lazy(() => import('./pages/Dashboard'));
+const AnalyticsRules = lazy(() => import('./pages/AnalyticsRules'));
+const Ingestion = lazy(() => import('./pages/Ingestion'));
+const DataConnectors = lazy(() => import('./pages/DataConnectors'));
+const DataCollectionRules = lazy(() => import('./pages/DataCollectionRules'));
+const SentinelHealth = lazy(() => import('./pages/SentinelHealth'));
 
 function App() {
   const [theme, setTheme] = useState<'dark' | 'light'>(() => {
@@ -35,14 +37,16 @@ function App() {
             <div className="app-layout">
               <Sidebar theme={theme} onToggleTheme={toggleTheme} />
               <main className="main-content">
-                <Routes>
-                  <Route path="/" element={<Dashboard />} />
-                  <Route path="/analytics-rules" element={<AnalyticsRules />} />
-                  <Route path="/ingestion" element={<Ingestion />} />
-                  <Route path="/data-connectors" element={<DataConnectors />} />
-                  {isDcrPageEnabled() && <Route path="/dcr" element={<DataCollectionRules />} />}
-                  <Route path="/sentinel-health" element={<SentinelHealth />} />
-                </Routes>
+                <Suspense fallback={<div className="loading">Loading...</div>}>
+                  <Routes>
+                    <Route path="/" element={<Dashboard />} />
+                    <Route path="/analytics-rules" element={<AnalyticsRules />} />
+                    <Route path="/ingestion" element={<Ingestion />} />
+                    <Route path="/data-connectors" element={<DataConnectors />} />
+                    {isDcrPageEnabled() && <Route path="/dcr" element={<DataCollectionRules />} />}
+                    <Route path="/sentinel-health" element={<SentinelHealth />} />
+                  </Routes>
+                </Suspense>
               </main>
             </div>
           </BrowserRouter>

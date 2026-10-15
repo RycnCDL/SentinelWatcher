@@ -9,6 +9,18 @@ export default defineConfig(({ mode }) => {
 
   return {
     plugins: [react()],
+    build: {
+      rollupOptions: {
+        output: {
+          // Separate, long-cacheable vendor chunks instead of one 1 MB bundle.
+          manualChunks: {
+            react: ['react', 'react-dom', 'react-router-dom'],
+            msal: ['@azure/msal-browser', '@azure/msal-react'],
+            charts: ['recharts'],
+          },
+        },
+      },
+    },
     server: {
       // Forward API and runtime config requests to the local API, so the browser
       // talks to a single origin in development just like in production.
