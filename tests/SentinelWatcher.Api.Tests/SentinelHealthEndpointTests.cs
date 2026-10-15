@@ -83,4 +83,50 @@ public class SentinelHealthEndpointTests : IClassFixture<TestApp>
         Assert.Null(result.ConnectorStatuses.Single(c => c.Name == "Microsoft Defender XDR").Category);
         Assert.Equal(HealthFailureCategory.Automation, Assert.Single(result.RecentFailures).Category);
     }
+
+    [Fact]
+    public async Task FailureCounts_CoverAllFailures_NotTheNewest50()
+    {
+        var now = DateTimeOffset.UtcNow;
+        using var fake = new FakeAzureApp(_app, logs: query =>
+        {
+            if (query.Contains("take 1"))
+                return LogsResults.Table(new[] { ("TimeGenerated", LogsColumnType.Datetime) }, new[] { new object?[] { now.ToString("o") } });
+            if (query.Contains("Failure = countif"))
+                return LogsResults.Table(
+                    new[]
+                    {
+                        ("SentinelResourceType", LogsColumnType.String), ("Total", LogsColumnType.Long),
+                        ("Success", LogsColumnType.Long), ("Failure", LogsColumnType.Long),
+                    },
+                    new[]
+                    {
+                        new object?[] { "Analytics Rule", 500L, 430L, 70L },
+                        new object?[] { "Playbook", 10L, 7L, 3L },
+                        new object?[] { "Data connector", 24L, 24L, 0L },
+                    });
+            if (query.Contains("take 50"))
+                return LogsResults.Table(
+                    new[]
+                    {
+                        ("TimeGenerated", LogsColumnType.Datetime), ("SentinelResourceType", LogsColumnType.String),
+                        ("SentinelResourceName", LogsColumnType.String), ("SentinelResourceKind", LogsColumnType.String),
+                        ("Status", LogsColumnType.String), ("Description", LogsColumnType.String),
+                    },
+                    Enumerable.Range(0, 50)
+                        .Select(i => new object?[] { now.AddMinutes(-i).ToString("o"), "Analytics Rule", $"Rule {i}", "Scheduled", "Failure", "failed" })
+                        .ToArray());
+            return LogsResults.Empty();
+        });
+        var client = fake.CreateViewerClient();
+
+        var result = await client.GetFromJsonAsync<SentinelHealthResponse>($"/api/sentinelhealth?{FakeAzureApp.WorkspaceQuery}&days=7");
+
+        Assert.NotNull(result);
+        Assert.Equal(50, result.RecentFailures.Count);
+        Assert.Equal(73, result.TotalFailures);
+        Assert.Equal(
+            new[] { ("Analytics Rule", 70), ("Playbook", 3) },
+            result.FailuresByType.Select(f => (f.ResourceType, f.Count)).ToArray());
+    }
 }

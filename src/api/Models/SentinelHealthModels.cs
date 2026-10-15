@@ -43,6 +43,13 @@ public class HealthFailureEvent
     public string Category { get; set; } = string.Empty;
 }
 
+/// <summary>Failed health events of one SentinelResourceType in the last 24 hours.</summary>
+public class HealthFailureCount
+{
+    public string ResourceType { get; set; } = string.Empty;
+    public int Count { get; set; }
+}
+
 public class SentinelHealthResponse
 {
     public DateTime QueryTime { get; set; }
@@ -73,6 +80,10 @@ public class SentinelHealthResponse
     // Current connector status (latest per connector)
     public List<ConnectorCurrentStatus> ConnectorStatuses { get; set; } = new();
 
-    // Recent failures in last 24h
+    // Failures in the last 24h per resource type, counted over all health events
+    public List<HealthFailureCount> FailuresByType { get; set; } = new();
+    public int TotalFailures { get; set; }
+
+    // Newest failures in the last 24h, at most 50. Use the counts above for totals.
     public List<HealthFailureEvent> RecentFailures { get; set; } = new();
 }

@@ -345,7 +345,7 @@ public class LogAnalyticsService
         await Task.WhenAll(summaryTask, trendTask, connectorsTask, autoDisabledTask, recentFailTask);
 
         // Populate response from results
-        var summary = summaryTask.Result;
+        var (summary, failuresByType) = summaryTask.Result;
         var rules       = summary.GetValueOrDefault(SentinelHealthScore.AnalyticsRule);
         var automation  = summary.GetValueOrDefault(SentinelHealthScore.AutomationRule);
         var playbooks   = summary.GetValueOrDefault(SentinelHealthScore.Playbook);
@@ -359,6 +359,8 @@ public class LogAnalyticsService
         response.AutoDisabledRules   = autoDisabledTask.Result;
         response.AutoDisabledRulesCount = response.AutoDisabledRules.Count;
         response.RecentFailures      = recentFailTask.Result;
+        response.FailuresByType      = failuresByType;
+        response.TotalFailures       = failuresByType.Sum(f => f.Count);
 
         // Connector health KPI: latest reported status per connector. A connector without a health
         // event in the selected range is stale and does not count as healthy.
@@ -392,9 +394,15 @@ public class LogAnalyticsService
             status, resourceType, resourceName, ws.WorkspaceName, description);
     }
 
-    private async Task<Dictionary<string, HealthRunCounts>> QuerySummaryAsync(LogsQueryClient client, WorkspaceContext ws)
+    /// <summary>
+    /// Run counts per resource type for the health score, and the failures per resource type
+    /// (with the type as Sentinel reports it) for the failure distribution.
+    /// </summary>
+    private async Task<(Dictionary<string, HealthRunCounts> Counts, List<HealthFailureCount> Failures)> QuerySummaryAsync(
+        LogsQueryClient client, WorkspaceContext ws)
     {
         var result = SentinelHealthScore.CreateSummary();
+        var failures = new List<HealthFailureCount>();
         try
         {
             var kql = @"
@@ -411,16 +419,19 @@ public class LogAnalyticsService
             {
                 foreach (var row in qr.Value.Table.Rows)
                 {
-                    var type = SentinelHealthScore.NormalizeResourceType(row.GetString("SentinelResourceType"));
-                    result[type] = new HealthRunCounts(
+                    var rawType = row.GetString("SentinelResourceType") ?? "";
+                    var counts = new HealthRunCounts(
                         Total:   (int)(row.GetInt64("Total") ?? 0),
                         Success: (int)(row.GetInt64("Success") ?? 0),
                         Failure: (int)(row.GetInt64("Failure") ?? 0));
+                    result[SentinelHealthScore.NormalizeResourceType(rawType)] = counts;
+                    if (counts.Failure > 0)
+                        failures.Add(new HealthFailureCount { ResourceType = rawType, Count = counts.Failure });
                 }
             }
         }
         catch (Exception ex) when (ex is not OperationCanceledException) { _logger.LogWarning(ex, "SentinelHealth summary query failed"); throw; }
-        return result;
+        return (result, failures.OrderByDescending(f => f.Count).ToList());
     }
 
     private async Task<List<HealthTrendPoint>> QueryTrendAsync(LogsQueryClient client, WorkspaceContext ws, int days)
