@@ -10,13 +10,18 @@
 #   - creates the enterprise application (service principal) and turns on
 #     "Assignment required", so only users and groups that are assigned the
 #     Viewer role can sign in at all
+#   - declares the sign-in permissions the web app requests (Microsoft Graph
+#     openid, profile, offline_access) and grants tenant-wide admin consent
+#     for them, so sign-in also works in tenants where user consent is
+#     turned off (--skip-admin-consent leaves that to you)
 #   - optionally assigns the Viewer role to you (--assign-me)
 #
 # No client secret is created: the backend calls Azure with a managed identity
 # (or with your az login during local development), not with this app.
 #
 # Usage:
-#   bash scripts/setup-app-registration.sh [--name NAME] [--redirect-uri URL]... [--assign-me]
+#   bash scripts/setup-app-registration.sh [--name NAME] [--redirect-uri URL]...
+#                                          [--assign-me] [--skip-admin-consent]
 #
 # Examples:
 #   bash scripts/setup-app-registration.sh --assign-me
@@ -25,9 +30,9 @@
 # The default redirect URI http://localhost:5173 (local development) is always added.
 #
 # Requirements: Azure CLI, signed in (az login) to the target tenant with a role that
-# can create app registrations and assign app roles, for example Application
-# Administrator or Cloud Application Administrator. Runs in Azure Cloud Shell,
-# Linux, macOS and Git Bash on Windows.
+# can create app registrations, grant admin consent for delegated permissions and
+# assign app roles, for example Application Administrator or Cloud Application
+# Administrator. Runs in Azure Cloud Shell, Linux, macOS and Git Bash on Windows.
 # ==============================================================================
 
 set -euo pipefail
@@ -35,19 +40,29 @@ set -euo pipefail
 APP_NAME="SentinelWatcher"
 REDIRECT_URIS=("http://localhost:5173")
 ASSIGN_ME=false
+ADMIN_CONSENT=true
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --name) APP_NAME="$2"; shift 2 ;;
     --redirect-uri) REDIRECT_URIS+=("${2%/}"); shift 2 ;;
     --assign-me) ASSIGN_ME=true; shift ;;
-    -h|--help) sed -n '2,32p' "$0"; exit 0 ;;
+    --skip-admin-consent) ADMIN_CONSENT=false; shift ;;
+    -h|--help) awk 'NR > 1 && /^#/ { sub(/^# ?/, ""); print; next } NR > 1 { exit }' "$0"; exit 0 ;;
     *) echo "Unknown argument: $1" >&2; exit 1 ;;
   esac
 done
 
 VIEWER_ROLE="SentinelWatcher.Viewer"
 GRAPH="https://graph.microsoft.com/v1.0"
+
+# Microsoft Graph and its delegated sign-in permissions. MSAL requests openid, profile and
+# offline_access on every sign-in in addition to the SentinelWatcher API scope.
+GRAPH_APP_ID="00000003-0000-0000-c000-000000000000"
+GRAPH_OPENID="37f7f235-527c-4136-accd-4a02d197296e"
+GRAPH_PROFILE="14dad69e-099b-42c9-810b-d002981feec1"
+GRAPH_OFFLINE_ACCESS="7427e0e9-2fba-42fe-b0c0-848c9e6a8182"
+SIGN_IN_SCOPES="openid profile offline_access"
 
 # Azure CLI on Windows prints CRLF line endings; strip carriage returns from values.
 azv() { az "$@" | tr -d '\r'; }
@@ -95,7 +110,15 @@ echo "Tenant:        $TENANT_ID"
 echo "Signed in as:  $(azv account show --query user.name -o tsv)"
 echo
 
-# 1. App registration (single tenant).
+# 1. App registration (single tenant). "az ad app create" updates an existing app with the same
+#    display name instead of creating a new one, so stop if the name is taken.
+EXISTING_APP_IDS="$(azv ad app list --display-name "$APP_NAME" --query "[].appId" -o tsv)"
+if [[ -n "$EXISTING_APP_IDS" ]]; then
+  echo "An app registration named '$APP_NAME' already exists (client ID: ${EXISTING_APP_IDS//$'\n'/, })." >&2
+  echo "Use it as it is, choose another name with --name, or delete it first. Nothing was changed." >&2
+  exit 1
+fi
+
 echo "Creating app registration '$APP_NAME'..."
 APP_ID="$(azv ad app create --display-name "$APP_NAME" --sign-in-audience AzureADMyOrg --query appId -o tsv)"
 APP_OBJECT_ID="$(azv ad app show --id "$APP_ID" --query id -o tsv)"
@@ -105,11 +128,19 @@ ROLE_ID="$(new_uuid)"
 REDIRECTS_JSON="$(printf '"%s",' "${REDIRECT_URIS[@]}")"
 REDIRECTS_JSON="[${REDIRECTS_JSON%,}]"
 
-# 2. SPA redirect URIs, API scope (v2 access tokens) and the Viewer app role.
+# 2. SPA redirect URIs, sign-in permissions, API scope (v2 access tokens) and the Viewer app role.
 cat > "$BODY_FILE" <<EOF
 {
   "identifierUris": ["api://$APP_ID"],
   "spa": { "redirectUris": $REDIRECTS_JSON },
+  "requiredResourceAccess": [{
+    "resourceAppId": "$GRAPH_APP_ID",
+    "resourceAccess": [
+      { "id": "$GRAPH_OPENID", "type": "Scope" },
+      { "id": "$GRAPH_PROFILE", "type": "Scope" },
+      { "id": "$GRAPH_OFFLINE_ACCESS", "type": "Scope" }
+    ]
+  }],
   "api": {
     "requestedAccessTokenVersion": 2,
     "oauth2PermissionScopes": [{
@@ -134,7 +165,7 @@ cat > "$BODY_FILE" <<EOF
 }
 EOF
 graph_patch "$GRAPH/applications/$APP_OBJECT_ID"
-echo "Configured redirect URIs, API scope and app role."
+echo "Configured redirect URIs, sign-in permissions, API scope and app role."
 
 # 3. Pre-authorize the app for its own scope, so users get no consent prompt.
 #    The whole "api" object is sent again because PATCH replaces it.
@@ -165,7 +196,34 @@ echo '{ "appRoleAssignmentRequired": true }' > "$BODY_FILE"
 graph_patch "$GRAPH/servicePrincipals/$SP_ID"
 echo "Created the enterprise application and set 'Assignment required'."
 
-# 5. Optionally assign the Viewer role to the signed-in user (retries while the new
+# 5. Tenant-wide admin consent for the sign-in permissions. Without it, users in tenants that
+#    block user consent see "Need admin approval" at their first sign-in. Retries while the new
+#    service principal propagates.
+CONSENT_STATUS="skipped (--skip-admin-consent)"
+if [[ "$ADMIN_CONSENT" == true ]]; then
+  CONSENT_STATUS="not granted"
+  GRAPH_SP_ID="$(azv ad sp show --id "$GRAPH_APP_ID" --query id -o tsv)"
+  cat > "$BODY_FILE" <<EOF
+{ "clientId": "$SP_ID", "consentType": "AllPrincipals", "resourceId": "$GRAPH_SP_ID", "scope": "$SIGN_IN_SCOPES" }
+EOF
+  for attempt in 1 2 3 4 5 6; do
+    if az rest --method POST --uri "$GRAPH/oauth2PermissionGrants" \
+         --headers "Content-Type=application/json" --body "@$BODY_FILE" --output none 2>/dev/null; then
+      CONSENT_STATUS="granted for $SIGN_IN_SCOPES"
+      echo "Granted tenant-wide admin consent for: $SIGN_IN_SCOPES."
+      break
+    fi
+    if [[ $attempt -eq 6 ]]; then
+      echo "Could not grant admin consent (your role may not allow it). Ask an administrator to open" >&2
+      echo "Entra admin center, App registrations, $APP_NAME, API permissions, and select" >&2
+      echo "'Grant admin consent'. Until then, users in tenants that block user consent can't sign in." >&2
+    else
+      sleep 10
+    fi
+  done
+fi
+
+# 6. Optionally assign the Viewer role to the signed-in user (retries while the new
 #    service principal propagates).
 if [[ "$ASSIGN_ME" == true ]]; then
   USER_ID="$(azv ad signed-in-user show --query id -o tsv)"
@@ -195,6 +253,7 @@ Tenant ID:   $TENANT_ID
 Client ID:   $APP_ID
 API scope:   api://$APP_ID/access_as_user
 App role:    $VIEWER_ROLE (Assignment required: yes)
+Consent:     $CONSENT_STATUS
 Redirects:   ${REDIRECT_URIS[*]}
 
 Backend settings (appsettings.Development.json or App Service app settings):
