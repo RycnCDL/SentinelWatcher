@@ -65,9 +65,11 @@ public class SentinelService
         // Azure Activity
         { "AzureActivity", ("Azure Activity", "AzureActivity") },
 
-        // Security Events (Windows)
-        { "SecurityEvent", ("Security Events via Legacy Agent", "SecurityEvents") },
-        { "WindowsEvent", ("Windows Security Events via AMA", "WindowsSecurityEvents") },
+        // Windows events. SecurityEvent is written by "Windows Security Events via AMA" (and was
+        // written by the legacy Log Analytics agent, which is retired). WindowsEvent is written by
+        // "Windows Forwarded Events".
+        { "SecurityEvent", ("Windows Security Events", "WindowsSecurityEvents") },
+        { "WindowsEvent", ("Windows Forwarded Events", "WindowsForwardedEvents") },
 
         // Syslog / CEF
         { "Syslog", ("Syslog", "Syslog") },
@@ -210,11 +212,16 @@ public class SentinelService
                         name = displayName.GetString() ?? name;
                     }
 
-                    var alreadyDetected = connectorGroups.Values.Any(c => c.ConnectorType == kind);
+                    // Skip connectors already shown from table data: same type, or every table
+                    // the connector writes to is already listed under a detected connector.
+                    var mappedTables = MapConnectorKindToTables(kind);
+                    var alreadyDetected =
+                        connectorGroups.Values.Any(c => c.ConnectorType == kind) ||
+                        (mappedTables.Count > 0 && mappedTables.All(t =>
+                            connectorGroups.Values.Any(c => c.AssociatedTables.Contains(t))));
                     if (alreadyDetected)
                         continue;
 
-                    var mappedTables = MapConnectorKindToTables(kind);
                     var connHealth = new ConnectorHealth
                     {
                         ConnectorId = id,
@@ -310,6 +317,7 @@ public class SentinelService
             "Syslog" or "CEF" or "GenericUI" => new List<string> { "Syslog", "CommonSecurityLog" },
             "WindowsFirewall" => new List<string> { "WindowsFirewall" },
             "SecurityEvents" or "WindowsSecurityEvents" => new List<string> { "SecurityEvent" },
+            "WindowsForwardedEvents" => new List<string> { "WindowsEvent" },
             "AzureSecurityCenter" => new List<string> { "SecurityAlert" },
             "MicrosoftThreatProtection" => new List<string> { "DeviceEvents", "DeviceLogonEvents", "DeviceProcessEvents" },
             "AzureActivity" => new List<string> { "AzureActivity" },
