@@ -160,7 +160,7 @@ export default function AnalyticsRules() {
         <h2 className="page-title">Analytics Rules</h2>
         <div className="page-meta">
           <span className="meta-text">
-            {data.totalRules} rules |{' '}
+            {data.totalRules} rules ({data.enabledRules} enabled) |{' '}
             {data.incidentsLoaded
               ? `${data.totalIncidents} incidents (30d)`
               : data.incidentsError ? 'incident counts unavailable' : 'loading incidents...'} |
@@ -183,6 +183,11 @@ export default function AnalyticsRules() {
 
       <div className="section">
         <h3>Top 20 Rules: Most Incidents</h3>
+        {data.incidentsLoaded && data.rulesWithIncidents > data.top20MostIncidents.length && (
+          <p className="meta-text">
+            Showing {data.top20MostIncidents.length} of {data.rulesWithIncidents} rules with incidents.
+          </p>
+        )}
         {data.incidentsError ? (
           <LoadErrorState error={data.incidentsError} what="Incident counts" />
         ) : !data.incidentsLoaded ? (
@@ -259,6 +264,11 @@ export default function AnalyticsRules() {
 
       <div className="section">
         <h3>Top 20 Rules: Least / No Incidents (Enabled)</h3>
+        {data.enabledRules > data.top20LeastIncidents.length && (
+          <p className="meta-text">
+            Showing {data.top20LeastIncidents.length} of {data.enabledRules} enabled rules.
+          </p>
+        )}
         <table className="data-table">
           <thead>
             <tr>

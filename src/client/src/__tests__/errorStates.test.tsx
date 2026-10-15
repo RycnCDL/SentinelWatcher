@@ -123,7 +123,8 @@ describe('positive control', () => {
   it('the Dashboard does show "All connectors receiving data" when the data really says so', async () => {
     const now = new Date().toISOString();
     vi.mocked(api.getAnalyticsRules).mockResolvedValue({
-      top20MostIncidents: [], top20LeastIncidents: [], totalRules: 3, incidentsLoaded: true, totalIncidents: 2,
+      top20MostIncidents: [], top20LeastIncidents: [], totalRules: 3, enabledRules: 3, disabledRules: 0,
+      rulesWithIncidents: 0, severityCounts: [{ severity: 'High', total: 3, enabled: 3 }], incidentsLoaded: true, totalIncidents: 2,
       incidentsFromExistingRules: 2, incidentsFromMissingRules: 0, incidentsWithoutRule: 0,
       missingRules: [], noRuleSources: [], lastRefreshed: now, incidentsError: null, refreshError: null,
     } satisfies AnalyticsRulesResponse);

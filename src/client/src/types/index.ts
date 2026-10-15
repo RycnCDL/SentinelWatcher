@@ -29,11 +29,27 @@ export interface NoRuleIncidents {
   lastIncident: string | null;
 }
 
+// Number of rules with one severity, over all rules.
+export interface RuleSeverityCount {
+  severity: string;
+  total: number;
+  enabled: number;
+}
+
 export interface AnalyticsRulesResponse {
-  // Existing rules with at least one incident.
+  // Display lists with at most 20 rules each. Never count them: use the totals below.
+  // Existing rules with at least one incident, most incidents first.
   top20MostIncidents: AnalyticsRuleStats[];
+  // Enabled rules with the fewest incidents.
   top20LeastIncidents: AnalyticsRuleStats[];
+  // Counts over all rules.
   totalRules: number;
+  enabledRules: number;
+  disabledRules: number;
+  // Existing rules with at least one incident (0 until incidentsLoaded).
+  rulesWithIncidents: number;
+  // High, Medium, Low, Informational, then any other value.
+  severityCounts: RuleSeverityCount[];
   // False while only the rule list is loaded.
   incidentsLoaded: boolean;
   // Distinct incidents created in the last 30 days.

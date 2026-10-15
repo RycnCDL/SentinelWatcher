@@ -103,24 +103,15 @@ export default function Dashboard() {
   }, [selectedWorkspace, showDcr]);
 
   // ── Derived data ──────────────────────────────────────────────────────────
-  const allRules = useMemo(() => {
-    if (!analytics) return [];
-    const map = new Map<string, typeof analytics.top20MostIncidents[0]>();
-    [...analytics.top20MostIncidents, ...analytics.top20LeastIncidents].forEach(r => map.set(r.ruleId, r));
-    return Array.from(map.values());
-  }, [analytics]);
+  // Rule counts come from the API, which counts all rules. The top 20 lists are for display only.
+  const severityData = useMemo(
+    () => (analytics?.severityCounts ?? []).map(c => ({ name: c.severity, value: c.total })),
+    [analytics],
+  );
 
-  const severityData = useMemo(() => {
-    const counts: Record<string, number> = {};
-    allRules.forEach(r => { counts[r.severity] = (counts[r.severity] ?? 0) + 1; });
-    return Object.entries(counts)
-      .map(([name, value]) => ({ name, value }))
-      .sort((a, b) => (SEVERITY_COLORS[a.name] ? 0 : 1) - (SEVERITY_COLORS[b.name] ? 0 : 1));
-  }, [allRules]);
-
-  const enabledCount  = useMemo(() => allRules.filter(r => r.enabled).length, [allRules]);
-  const disabledCount = useMemo(() => allRules.filter(r => !r.enabled).length, [allRules]);
-  const rulesWithIncidents = useMemo(() => allRules.filter(r => r.incidentCount > 0).length, [allRules]);
+  const enabledCount  = analytics?.enabledRules ?? 0;
+  const disabledCount = analytics?.disabledRules ?? 0;
+  const rulesWithIncidents = analytics?.rulesWithIncidents ?? 0;
 
   const topCostTables = useMemo(() => {
     if (!ingestion) return [];
@@ -475,8 +466,8 @@ export default function Dashboard() {
             </div>
           )}
 
-          {/* Severity breakdown: only when incident data is loaded */}
-          {severityData.length > 0 && analytics && analytics.totalIncidents > 0 && (
+          {/* Severity breakdown of all rules */}
+          {severityData.length > 0 && analytics && (
             <div className="section">
               <h3>Rule Severity Breakdown</h3>
               <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
