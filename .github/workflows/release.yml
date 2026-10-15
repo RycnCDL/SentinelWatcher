@@ -1,0 +1,68 @@
+name: Release
+
+# Pushing a tag such as v0.1.0 builds the package and publishes a GitHub release with:
+# - sentinelwatcher.zip: the API with the SPA in wwwroot (used by WEBSITE_RUN_FROM_PACKAGE)
+# - sentinelwatcher.zip.sha256: its checksum
+# - azuredeploy.json: the ARM template for this version
+# The release notes are the matching section of CHANGELOG.md.
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Build and publish release
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: 10.0.x
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: src/client/package-lock.json
+
+      - name: Release notes from CHANGELOG.md
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          awk -v v="$version" '
+            index($0, "## [" v "]") == 1 { found = 1; next }
+            found && /^## \[/ { exit }
+            found { print }
+          ' CHANGELOG.md > "$RUNNER_TEMP/notes.md"
+          if [ ! -s "$RUNNER_TEMP/notes.md" ]; then
+            echo "::error::CHANGELOG.md has no section '## [$version]'"
+            exit 1
+          fi
+          cat "$RUNNER_TEMP/notes.md"
+
+      - name: Test
+        run: dotnet test SentinelWatcher.sln -c Release
+
+      - name: Build package
+        shell: pwsh
+        run: ./scripts/build-package.ps1 -Version $env:GITHUB_REF_NAME.TrimStart('v')
+
+      - name: Checksum
+        working-directory: artifacts
+        run: sha256sum sentinelwatcher.zip > sentinelwatcher.zip.sha256
+
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" \
+            artifacts/sentinelwatcher.zip \
+            artifacts/sentinelwatcher.zip.sha256 \
+            infra/azuredeploy.json \
+            --title "SentinelWatcher $GITHUB_REF_NAME" \
+            --notes-file "$RUNNER_TEMP/notes.md" \
+            --verify-tag
