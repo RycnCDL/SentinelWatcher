@@ -55,6 +55,8 @@ export interface AnalyticsRulesResponse {
   // Distinct incidents created in the last 30 days.
   totalIncidents: number;
   incidentsFromExistingRules: number;
+  // Newest incident of any existing rule (over all rules, not the top 20 lists).
+  lastIncidentFromExistingRules: string | null;
   incidentsFromMissingRules: number;
   incidentsWithoutRule: number;
   missingRules: MissingRuleIncidents[];

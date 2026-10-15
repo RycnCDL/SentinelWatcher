@@ -125,7 +125,7 @@ describe('positive control', () => {
     vi.mocked(api.getAnalyticsRules).mockResolvedValue({
       top20MostIncidents: [], top20LeastIncidents: [], totalRules: 3, enabledRules: 3, disabledRules: 0,
       rulesWithIncidents: 0, severityCounts: [{ severity: 'High', total: 3, enabled: 3 }], incidentsLoaded: true, totalIncidents: 2,
-      incidentsFromExistingRules: 2, incidentsFromMissingRules: 0, incidentsWithoutRule: 0,
+      incidentsFromExistingRules: 2, lastIncidentFromExistingRules: now, incidentsFromMissingRules: 0, incidentsWithoutRule: 0,
       missingRules: [], noRuleSources: [], lastRefreshed: now, incidentsError: null, refreshError: null,
     } satisfies AnalyticsRulesResponse);
     vi.mocked(api.getIngestion).mockResolvedValue({

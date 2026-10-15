@@ -51,7 +51,7 @@ function IncidentSources({ data }: { data: AnalyticsRulesResponse }) {
           <tr>
             <td>Existing analytics rules ({data.totalRules})</td>
             <td className="text-right">{data.incidentsFromExistingRules}</td>
-            <td>-</td>
+            <td>{formatDate(data.lastIncidentFromExistingRules)}</td>
           </tr>
           {data.missingRules.map((m) => (
             <tr key={m.ruleId}>

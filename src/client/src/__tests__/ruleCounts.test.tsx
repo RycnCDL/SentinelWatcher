@@ -67,6 +67,7 @@ const response: AnalyticsRulesResponse = {
   incidentsLoaded: true,
   totalIncidents: 104,
   incidentsFromExistingRules: 0,
+  lastIncidentFromExistingRules: null,
   incidentsFromMissingRules: 0,
   incidentsWithoutRule: 104,
   missingRules: [],
@@ -124,5 +125,30 @@ describe('rule counts with more than 20 rules', () => {
 
     expect(await screen.findByText(/35 rules \(35 enabled\)/)).toBeTruthy();
     expect(screen.getByText('Showing 20 of 35 enabled rules.')).toBeTruthy();
+  });
+});
+
+describe('Where incidents come from', () => {
+  it('shows the newest incident of existing rules in the "Existing analytics rules" row', async () => {
+    const newest = '2026-10-15T09:08:12Z';
+    vi.mocked(api.getAnalyticsRules).mockResolvedValue({
+      ...response,
+      incidentsFromExistingRules: 48,
+      lastIncidentFromExistingRules: newest,
+      totalIncidents: 152,
+    });
+
+    render(<AnalyticsRules />);
+
+    const row = (await screen.findByText(/^Existing analytics rules/)).closest('tr');
+    expect(row?.textContent).toContain('48');
+    expect(row?.textContent).toContain(new Date(newest).toLocaleString());
+  });
+
+  it('shows "-" when existing rules have no incidents', async () => {
+    render(<AnalyticsRules />);
+
+    const row = (await screen.findByText(/^Existing analytics rules/)).closest('tr');
+    expect(row?.lastElementChild?.textContent).toBe('-');
   });
 });
