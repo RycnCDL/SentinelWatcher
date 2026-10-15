@@ -142,12 +142,13 @@ export default function Dashboard() {
           color="purple"
         />
         <StatusCard
-          title="Connectors Healthy"
+          title="Data freshness"
           value={`${connectors?.healthyCount ?? '-'} / ${connectors?.connectors?.length ?? '-'}`}
           subtitle={
             connectorErrorCount > 0 ? `${connectorErrorCount} error${connectorErrorCount > 1 ? 's' : ''}, ${connectorWarnCount} warning${connectorWarnCount !== 1 ? 's' : ''}`
             : connectorWarnCount > 0 ? `${connectorWarnCount} warning${connectorWarnCount > 1 ? 's' : ''}`
-            : 'All connectors healthy'
+            : (connectors?.quietCount ?? 0) > 0 ? `Receiving data, ${connectors?.quietCount} quiet`
+            : 'All connectors receiving data'
           }
           icon={connectorErrorCount > 0 ? <AlertTriangle size={24} /> : <Cable size={24} />}
           color={connectorErrorCount > 0 ? 'red' : connectorWarnCount > 0 ? 'yellow' : 'green'}
@@ -286,9 +287,9 @@ export default function Dashboard() {
           {connectors && connectors.connectors.length > 0 && (
             <div className="section">
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-                <h3 style={{ margin: 0 }}>Connector Status</h3>
+                <h3 style={{ margin: 0 }} title="Based on the newest record in each connector's tables">Data freshness</h3>
                 <span style={{ fontSize: '0.75rem', color: connectors.errorCount > 0 ? 'var(--danger)' : connectors.warningCount > 0 ? 'var(--warning)' : 'var(--healthy)' }}>
-                  {connectors.healthyCount}/{connectors.connectors.length} healthy
+                  {connectors.healthyCount}/{connectors.connectors.length} receiving data
                 </span>
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>

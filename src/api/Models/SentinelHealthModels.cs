@@ -10,7 +10,7 @@ public class AutoDisabledRule
 
 public class HealthTrendPoint
 {
-    public string Day { get; set; } = string.Empty; // "Mon 17", "Tue 18" etc.
+    public string Day { get; set; } = string.Empty; // ISO date, yyyy-MM-dd
     public int DataConnectorFailures { get; set; }
     public int AnalyticsRuleFailures { get; set; }
     public int AutomationFailures { get; set; }
@@ -23,7 +23,12 @@ public class ConnectorCurrentStatus
     public string Kind { get; set; } = string.Empty;
     public string Status { get; set; } = string.Empty;
     public DateTime? LastEvent { get; set; }
-    public string? Description { get; set; }
+
+    /// <summary>No health event for this connector in the selected range.</summary>
+    public bool IsStale { get; set; }
+
+    /// <summary>Fixed failure category (see HealthFailureCategory), null for Success.</summary>
+    public string? Category { get; set; }
 }
 
 public class HealthFailureEvent
@@ -33,7 +38,9 @@ public class HealthFailureEvent
     public string ResourceName { get; set; } = string.Empty;
     public string Kind { get; set; } = string.Empty;
     public string Status { get; set; } = string.Empty;
-    public string Description { get; set; } = string.Empty;
+
+    /// <summary>Fixed failure category (see HealthFailureCategory). The raw description is only logged on the server.</summary>
+    public string Category { get; set; } = string.Empty;
 }
 
 public class SentinelHealthResponse
@@ -44,9 +51,11 @@ public class SentinelHealthResponse
     // Health Score (0 to 100)
     public int HealthScore { get; set; }
 
-    // Connectors with a reported status, and how many of them last reported Success
+    // Connector health: connectors with a reported status, how many last reported Success
+    // with a health event in the selected range, and how many had no event in that range
     public int TotalConnectors { get; set; }
     public int HealthyConnectors { get; set; }
+    public int StaleConnectors { get; set; }
 
     // Run KPIs: last 24h
     public int TotalRuleRuns { get; set; }

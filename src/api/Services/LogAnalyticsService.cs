@@ -324,7 +324,7 @@ public class LogAnalyticsService
         // Run all 5 queries in parallel
         var summaryTask       = QuerySummaryAsync(logsClient, workspace);
         var trendTask         = QueryTrendAsync(logsClient, workspace, days);
-        var connectorsTask    = QueryConnectorStatusAsync(logsClient, workspace);
+        var connectorsTask    = QueryConnectorStatusAsync(logsClient, workspace, days);
         var autoDisabledTask  = QueryAutoDisabledRulesAsync(logsClient, workspace);
         var recentFailTask    = QueryRecentFailuresAsync(logsClient, workspace);
 
@@ -346,9 +346,11 @@ public class LogAnalyticsService
         response.AutoDisabledRulesCount = response.AutoDisabledRules.Count;
         response.RecentFailures      = recentFailTask.Result;
 
-        // Connector KPI: latest reported status per connector, not the number of health events.
+        // Connector health KPI: latest reported status per connector. A connector without a health
+        // event in the selected range is stale and does not count as healthy.
         response.TotalConnectors   = response.ConnectorStatuses.Count;
-        response.HealthyConnectors = response.ConnectorStatuses.Count(c => c.Status == "Success");
+        response.HealthyConnectors = response.ConnectorStatuses.Count(c => c.Status == "Success" && !c.IsStale);
+        response.StaleConnectors   = response.ConnectorStatuses.Count(c => c.IsStale);
 
         // Health Score: % of health events in the last 24h that succeeded, over all resource types.
         response.HealthScore = SentinelHealthScore.Compute(summary.Values);
@@ -357,6 +359,24 @@ public class LogAnalyticsService
     }
 
     // ── Helper queries ────────────────────────────────────────────────────────
+
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<string, byte> _loggedHealthDescriptions = new();
+
+    /// <summary>
+    /// Health event descriptions can contain account names, resource names or URLs, so the browser
+    /// only gets a category. The raw text of non-success events is logged here, once per resource
+    /// and text.
+    /// </summary>
+    private void LogHealthDescriptionOnce(WorkspaceContext ws, string resourceType, string resourceName, string status, string? description)
+    {
+        if (string.Equals(status, "Success", StringComparison.OrdinalIgnoreCase) || string.IsNullOrWhiteSpace(description))
+            return;
+        if (!_loggedHealthDescriptions.TryAdd($"{ws.Key}|{resourceType}|{resourceName}|{status}|{description}", 0))
+            return;
+
+        _logger.LogInformation("Sentinel health {Status} for {ResourceType} '{ResourceName}' in workspace {Workspace}: {Description}",
+            status, resourceType, resourceName, ws.WorkspaceName, description);
+    }
 
     private async Task<Dictionary<string, HealthRunCounts>> QuerySummaryAsync(LogsQueryClient client, WorkspaceContext ws)
     {
@@ -407,7 +427,8 @@ public class LogAnalyticsService
             {
                 foreach (var row in qr.Value.Table.Rows)
                 {
-                    var day = row.GetDateTimeOffset("Day")?.UtcDateTime.ToString("ddd dd") ?? "";
+                    // ISO date (yyyy-MM-dd); the client formats it for display.
+                    var day = row.GetDateTimeOffset("Day")?.UtcDateTime.ToString("yyyy-MM-dd") ?? "";
                     var type = row.GetString("SentinelResourceType") ?? "";
                     var count = (int)(row.GetInt64("Failures") ?? 0);
 
@@ -429,36 +450,45 @@ public class LogAnalyticsService
         return points.Values.ToList();
     }
 
-    private async Task<List<ConnectorCurrentStatus>> QueryConnectorStatusAsync(LogsQueryClient client, WorkspaceContext ws)
+    private async Task<List<ConnectorCurrentStatus>> QueryConnectorStatusAsync(LogsQueryClient client, WorkspaceContext ws, int days)
     {
         var result = new List<ConnectorCurrentStatus>();
         try
         {
+            // Latest status per connector. Grouping by name and kind (not resource ID) keeps one row
+            // per connector when its resource ID changed, for example after it was reconnected.
             var kql = @"
                 _SentinelHealth()
-                | where OperationName == 'Data fetch status change'
+                | where SentinelResourceType == 'Data connector'
                 | where Status in ('Success', 'Failure')
-                | summarize TimeGenerated = arg_max(TimeGenerated, *) by SentinelResourceName, SentinelResourceId
-                | project SentinelResourceName, SentinelResourceKind, Status, TimeGenerated, Description
+                | summarize arg_max(TimeGenerated, Status, Description) by SentinelResourceName, SentinelResourceKind
                 | order by Status asc, TimeGenerated desc
             ";
             var qr = await client.QueryResourceAsync(ws.ResourceIdentifier, kql, LogsQueryTimeRange.All);
-            if (qr.Value.Status == LogsQueryResultStatus.Success)
+            var staleBefore = DateTime.UtcNow.AddDays(-days);
+            foreach (var row in qr.Value.Table.Rows)
             {
-                foreach (var row in qr.Value.Table.Rows)
+                var name   = row.GetString("SentinelResourceName") ?? "";
+                var status = row.GetString("Status") ?? "";
+                var last   = row.GetDateTimeOffset("TimeGenerated")?.UtcDateTime;
+                var description = row.GetString("Description");
+                LogHealthDescriptionOnce(ws, "Data connector", name, status, description);
+
+                result.Add(new ConnectorCurrentStatus
                 {
-                    result.Add(new ConnectorCurrentStatus
-                    {
-                        Name        = row.GetString("SentinelResourceName") ?? "",
-                        Kind        = row.GetString("SentinelResourceKind") ?? "",
-                        Status      = row.GetString("Status") ?? "",
-                        LastEvent   = row.GetDateTimeOffset("TimeGenerated")?.UtcDateTime,
-                        Description = row.GetString("Description")
-                    });
-                }
+                    Name      = name,
+                    Kind      = row.GetString("SentinelResourceKind") ?? "",
+                    Status    = status,
+                    LastEvent = last,
+                    IsStale   = !last.HasValue || last.Value < staleBefore,
+                    Category  = HealthFailureCategory.Categorize(status, description),
+                });
             }
         }
-        catch (Exception ex) { _logger.LogWarning(ex, "SentinelHealth connector status query failed"); }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            _logger.LogWarning(ex, "SentinelHealth connector status query failed");
+        }
         return result;
     }
 
@@ -513,14 +543,20 @@ public class LogAnalyticsService
             {
                 foreach (var row in qr.Value.Table.Rows)
                 {
+                    var resourceType = row.GetString("SentinelResourceType") ?? "";
+                    var resourceName = row.GetString("SentinelResourceName") ?? "";
+                    var status       = row.GetString("Status") ?? "";
+                    var description  = row.GetString("Description");
+                    LogHealthDescriptionOnce(ws, resourceType, resourceName, status, description);
+
                     result.Add(new HealthFailureEvent
                     {
                         TimeGenerated = row.GetDateTimeOffset("TimeGenerated")?.UtcDateTime ?? DateTime.UtcNow,
-                        ResourceType  = row.GetString("SentinelResourceType") ?? "",
-                        ResourceName  = row.GetString("SentinelResourceName") ?? "",
+                        ResourceType  = resourceType,
+                        ResourceName  = resourceName,
                         Kind          = row.GetString("SentinelResourceKind") ?? "",
-                        Status        = row.GetString("Status") ?? "",
-                        Description   = row.GetString("Description") ?? ""
+                        Status        = status,
+                        Category      = HealthFailureCategory.Categorize(status, description) ?? HealthFailureCategory.Other
                     });
                 }
             }

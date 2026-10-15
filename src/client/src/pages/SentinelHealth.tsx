@@ -56,14 +56,19 @@ function ScoreRing({ score }: { score: number }) {
   );
 }
 
+// SentinelResourceType values are "Data connector", "Analytics rule" and so on.
+function typeKey(type: string): string {
+  return type.replace(/\s+/g, '').toLowerCase();
+}
+
 function TypeChip({ type }: { type: string }) {
   const map: Record<string, { bg: string; color: string }> = {
-    DataConnector:     { bg: 'rgba(59,130,246,0.15)',  color: '#93c5fd' },
-    AnalyticsRule:     { bg: 'rgba(168,85,247,0.15)',  color: '#d8b4fe' },
-    AutomationRule:    { bg: 'rgba(245,158,11,0.15)',  color: '#fcd34d' },
-    Playbook:          { bg: 'rgba(20,184,166,0.15)',  color: '#5eead4' },
+    dataconnector:  { bg: 'rgba(59,130,246,0.15)',  color: '#93c5fd' },
+    analyticsrule:  { bg: 'rgba(168,85,247,0.15)',  color: '#d8b4fe' },
+    automationrule: { bg: 'rgba(245,158,11,0.15)',  color: '#fcd34d' },
+    playbook:       { bg: 'rgba(20,184,166,0.15)',  color: '#5eead4' },
   };
-  const style = map[type] ?? { bg: 'rgba(107,114,128,0.12)', color: '#9ca3af' };
+  const style = map[typeKey(type)] ?? { bg: 'rgba(107,114,128,0.12)', color: '#9ca3af' };
   return (
     <span className="sh-type-chip" style={{ background: style.bg, color: style.color }}>
       {type}
@@ -87,8 +92,12 @@ function StatusDot({ status }: { status: string }) {
   );
 }
 
-function ConnectorRow({ c }: { c: ConnectorCurrentStatus }) {
-  const isOk = ['success', 'healthy', 'running'].includes(c.status.toLowerCase());
+function isHealthy(c: ConnectorCurrentStatus): boolean {
+  return !c.isStale && ['success', 'healthy', 'running'].includes(c.status.toLowerCase());
+}
+
+function ConnectorRow({ c, days }: { c: ConnectorCurrentStatus; days: number }) {
+  const isOk = isHealthy(c);
   return (
     <tr>
       <td>
@@ -99,15 +108,24 @@ function ConnectorRow({ c }: { c: ConnectorCurrentStatus }) {
       </td>
       <td><TypeChip type={c.kind} /></td>
       <td>
-        <span style={{ color: isOk ? 'var(--healthy)' : 'var(--danger)', fontWeight: 600, fontSize: '0.82rem' }}>
-          {c.status}
-        </span>
+        {c.isStale ? (
+          <span
+            style={{ color: 'var(--text-muted)', fontWeight: 600, fontSize: '0.82rem' }}
+            title={`No health event in the last ${days} days. Last reported status: ${c.status}`}
+          >
+            Stale ({c.status})
+          </span>
+        ) : (
+          <span style={{ color: isOk ? 'var(--healthy)' : 'var(--danger)', fontWeight: 600, fontSize: '0.82rem' }}>
+            {c.status}
+          </span>
+        )}
       </td>
       <td style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>
         {c.lastEvent ? new Date(c.lastEvent).toLocaleString() : '-'}
       </td>
       <td style={{ color: 'var(--text-secondary)', fontSize: '0.8rem', maxWidth: 260 }}>
-        <span className="truncate" title={c.description ?? ''}>{c.description ?? '-'}</span>
+        {c.category ?? '-'}
       </td>
     </tr>
   );
@@ -126,22 +144,18 @@ function FailureRow({ f }: { f: HealthFailureEvent }) {
         </span>
       </td>
       <td style={{ color: 'var(--danger)', fontWeight: 600, fontSize: '0.82rem' }}>{f.status}</td>
-      <td style={{ color: 'var(--text-secondary)', fontSize: '0.8rem' }}>
-        <span className="truncate" style={{ maxWidth: 300, display: 'block' }} title={f.description}>
-          {f.description}
-        </span>
-      </td>
+      <td style={{ color: 'var(--text-secondary)', fontSize: '0.8rem' }}>{f.category}</td>
     </tr>
   );
 }
 
 // ─── Pie colours ──────────────────────────────────────────────────────────────
 const PIE_COLORS: Record<string, string> = {
-  DataConnector:  '#3B82F6',
-  AnalyticsRule:  '#a855f7',
-  AutomationRule: '#F59E0B',
-  Playbook:       '#14b8a6',
-  Other:          '#6B7280',
+  dataconnector:  '#3B82F6',
+  analyticsrule:  '#a855f7',
+  automationrule: '#F59E0B',
+  playbook:       '#14b8a6',
+  other:          '#6B7280',
 };
 
 // ─── Main page ────────────────────────────────────────────────────────────────
@@ -201,13 +215,13 @@ export default function SentinelHealth() {
     return Object.entries(counts).map(([name, value]) => ({ name, value }));
   })();
 
-  const filteredConnectors = connectorFilter === 'issues'
-    ? data.connectorStatuses.filter(c => !['success', 'healthy', 'running'].includes(c.status.toLowerCase()))
-    : data.connectorStatuses;
+  const connectorIssues = data.connectorStatuses.filter(c => !isHealthy(c));
+  const filteredConnectors = connectorFilter === 'issues' ? connectorIssues : data.connectorStatuses;
 
+  // The API sends ISO dates (yyyy-MM-dd); parse them as local dates for display.
   const trendFormatted: HealthTrendPoint[] = data.trend.map(t => ({
     ...t,
-    day: new Date(t.day).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }),
+    day: new Date(`${t.day}T00:00:00`).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }),
   }));
 
   const connectorHealthPct = data.totalConnectors > 0
@@ -273,9 +287,10 @@ export default function SentinelHealth() {
             <div className="sh-kpi-icon"><Wifi size={20} /></div>
             <div className="sh-kpi-body">
               <div className="sh-kpi-value">{data.healthyConnectors}<span className="sh-kpi-total">/{data.totalConnectors}</span></div>
-              <div className="sh-kpi-label">Connectors Healthy</div>
+              <div className="sh-kpi-label">Connector health</div>
               <div className="sh-kpi-sub" style={{ color: connectorHealthPct < 80 ? 'var(--danger)' : 'var(--healthy)' }}>
                 {connectorHealthPct}% healthy
+                {data.staleConnectors > 0 && `, ${data.staleConnectors} stale`}
               </div>
             </div>
           </div>
@@ -371,7 +386,7 @@ export default function SentinelHealth() {
                   dataKey="value"
                 >
                   {failuresByType.map((entry) => (
-                    <Cell key={entry.name} fill={PIE_COLORS[entry.name] ?? PIE_COLORS.Other} />
+                    <Cell key={entry.name} fill={PIE_COLORS[typeKey(entry.name)] ?? PIE_COLORS.other} />
                   ))}
                 </Pie>
                 <Tooltip contentStyle={chart.tooltipStyle} />
@@ -389,13 +404,15 @@ export default function SentinelHealth() {
       {/* ── Connector Status table ── */}
       <div className="section">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
-          <h3 style={{ margin: 0 }}>Connector Status</h3>
+          <h3 style={{ margin: 0 }} title="Latest status per connector reported by SentinelHealth. Stale: no health event in the selected range.">
+            Connector health (SentinelHealth)
+          </h3>
           <div className="filter-bar" style={{ margin: 0, padding: 0 }}>
             <button className={`filter-btn ${connectorFilter === 'all' ? 'active' : ''}`} onClick={() => setConnectorFilter('all')}>
               All ({data.connectorStatuses.length})
             </button>
             <button className={`filter-btn ${connectorFilter === 'issues' ? 'active' : ''}`} onClick={() => setConnectorFilter('issues')}>
-              Issues only ({data.connectorStatuses.filter(c => !['success', 'healthy', 'running'].includes(c.status.toLowerCase())).length})
+              Issues and stale ({connectorIssues.length})
             </button>
           </div>
         </div>
@@ -411,11 +428,11 @@ export default function SentinelHealth() {
                 <th>Type</th>
                 <th>Status</th>
                 <th>Last Event</th>
-                <th>Description</th>
+                <th>Category</th>
               </tr>
             </thead>
             <tbody>
-              {filteredConnectors.map((c, i) => <ConnectorRow key={i} c={c} />)}
+              {filteredConnectors.map((c, i) => <ConnectorRow key={i} c={c} days={days} />)}
             </tbody>
           </table>
         )}
@@ -436,7 +453,7 @@ export default function SentinelHealth() {
                 <th>Resource Type</th>
                 <th>Name</th>
                 <th>Status</th>
-                <th>Description</th>
+                <th>Category</th>
               </tr>
             </thead>
             <tbody>

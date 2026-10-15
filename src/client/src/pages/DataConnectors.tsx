@@ -139,9 +139,9 @@ export default function DataConnectors() {
   return (
     <div className="page">
       <div className="page-header">
-        <h2 className="page-title">Data Connectors</h2>
-        <span className="meta-text">
-          Last checked: {new Date(data.lastChecked).toLocaleTimeString()}
+        <h2 className="page-title">Data Connectors: Data freshness</h2>
+        <span className="meta-text" title="Status comes from the newest record in each connector's tables. Connector health reported by Microsoft Sentinel is on the Sentinel Health page.">
+          Based on the newest record per table | Last checked: {new Date(data.lastChecked).toLocaleTimeString()}
         </span>
       </div>
 

@@ -137,7 +137,10 @@ export interface ConnectorCurrentStatus {
   kind: string;
   status: string;
   lastEvent: string | null;
-  description: string | null;
+  // No health event for this connector in the selected range.
+  isStale: boolean;
+  // Fixed failure category; null for Success. Raw descriptions stay on the server.
+  category: string | null;
 }
 
 export interface HealthFailureEvent {
@@ -146,7 +149,7 @@ export interface HealthFailureEvent {
   resourceName: string;
   kind: string;
   status: string;
-  description: string;
+  category: string;
 }
 
 export interface SentinelHealthResponse {
@@ -157,6 +160,7 @@ export interface SentinelHealthResponse {
   // KPIs
   totalConnectors: number;
   healthyConnectors: number;
+  staleConnectors: number;
   totalRuleRuns: number;
   failedRuleRuns: number;
   autoDisabledRulesCount: number;
