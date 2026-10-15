@@ -58,6 +58,32 @@ public class IncidentAttributionTests : IClassFixture<TestApp>
         // No existing rule has incidents, so the "most incidents" list is empty (the UI shows an empty state).
         Assert.Empty(result.Top20MostIncidents);
         Assert.Equal(2, result.Top20LeastIncidents.Count);
+
+        // No existing rule has incidents, so there is no last incident for them either.
+        Assert.Null(result.LastIncidentFromExistingRules);
+    }
+
+    [Fact]
+    public void LastIncidentFromExistingRules_IsTheNewestOverAllRules_NotTheTop20()
+    {
+        // 25 rules: 24 with 5 older incidents each, and one with a single, newest incident. The
+        // single-incident rule is not in the "most incidents" top 20.
+        var rules = Enumerable.Range(1, 25)
+            .Select(i => (Id: $"{RulePrefix}22222222-aaaa-bbbb-cccc-{i:D12}", Name: $"Rule {i:D2}", Severity: "Medium", Enabled: true))
+            .ToList();
+        var groups = rules.Take(24)
+            .Select((r, i) => new IncidentGroup(IncidentAttribution.RuleKey(r.Id), "", 5, Now.AddDays(-2).AddMinutes(i), "title"))
+            .Append(new IncidentGroup(IncidentAttribution.RuleKey(rules[24].Id), "", 1, Now.AddHours(-1), "title"))
+            // A deleted rule and a Defender XDR incident that are newer still do not count.
+            .Append(new IncidentGroup("c7793e93-dea2-a530-2088-a0f559b143ee", "", 48, Now, "Suspicious_Scheduled_Task_Activity"))
+            .Append(new IncidentGroup("", "Microsoft XDR", 3, Now, null))
+            .ToList();
+
+        var result = IncidentAttribution.Build(rules, groups, totalIncidents: 172, incidentsLoaded: true);
+
+        Assert.DoesNotContain(result.Top20MostIncidents, r => r.RuleName == "Rule 25");
+        Assert.Equal(Now.AddHours(-1), result.LastIncidentFromExistingRules);
+        Assert.Equal(121, result.IncidentsFromExistingRules);
     }
 
     [Fact]

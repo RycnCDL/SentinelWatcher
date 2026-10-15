@@ -69,6 +69,10 @@ public class AnalyticsRulesResponse
     // Where the incidents come from. An incident linked to several rules counts once per rule,
     // so the three numbers can add up to more than TotalIncidents.
     public int IncidentsFromExistingRules { get; set; }
+
+    /// <summary>Newest incident of any existing rule, over all rules. Null when they have none.</summary>
+    public DateTime? LastIncidentFromExistingRules { get; set; }
+
     public int IncidentsFromMissingRules { get; set; }
     public int IncidentsWithoutRule { get; set; }
     public List<MissingRuleIncidents> MissingRules { get; set; } = new();

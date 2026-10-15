@@ -79,6 +79,7 @@ public static class IncidentAttribution
             IncidentsLoaded = incidentsLoaded,
             TotalIncidents = totalIncidents,
             IncidentsFromExistingRules = stats.Sum(s => s.IncidentCount),
+            LastIncidentFromExistingRules = stats.Max(s => s.LastIncident),
             IncidentsFromMissingRules = missing.Sum(m => m.IncidentCount),
             IncidentsWithoutRule = withoutRule.Sum(n => n.IncidentCount),
             MissingRules = missing,
