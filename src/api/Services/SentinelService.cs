@@ -1,5 +1,4 @@
 using System.Text.Json;
-using Microsoft.Extensions.Options;
 using SentinelWatcher.Api.Models;
 
 namespace SentinelWatcher.Api.Services;
@@ -7,7 +6,7 @@ namespace SentinelWatcher.Api.Services;
 public class SentinelService
 {
     private readonly ArmRestClient _arm;
-    private readonly CacheSettingsConfig _cacheConfig;
+    private readonly ConnectorThresholds _thresholds;
     private readonly ILogger<SentinelService> _logger;
 
     private const string ApiVersion = "2024-03-01";
@@ -115,11 +114,11 @@ public class SentinelService
 
     public SentinelService(
         ArmRestClient arm,
-        IOptions<CacheSettingsConfig> cacheConfig,
+        ConnectorThresholds thresholds,
         ILogger<SentinelService> logger)
     {
         _arm = arm;
-        _cacheConfig = cacheConfig.Value;
+        _thresholds = thresholds;
         _logger = logger;
     }
 
@@ -256,17 +255,19 @@ public class SentinelService
             var now = DateTime.UtcNow;
             foreach (var health in connectorGroups.Values)
             {
-                ApplyHealthStatus(health, tableTiers, _cacheConfig.ConnectorGapThresholdMinutes, now);
+                ApplyHealthStatus(health, tableTiers, _thresholds.For(health.ConnectorType), now);
                 response.Connectors.Add(health);
             }
 
             response.Connectors = response.Connectors
-                .OrderBy(c => c.Status == "Error" ? 0 : c.Status == "Warning" ? 1 : c.Status == "Healthy" ? 2 : 3)
+                .OrderBy(c => c.Status switch { "Error" => 0, "Warning" => 1, "Healthy" => 2, "Quiet" => 3, _ => 4 })
+                .ThenBy(c => c.ConnectorName)
                 .ToList();
 
             response.HealthyCount = response.Connectors.Count(c => c.Status == "Healthy");
             response.WarningCount = response.Connectors.Count(c => c.Status == "Warning");
             response.ErrorCount = response.Connectors.Count(c => c.Status == "Error");
+            response.QuietCount = response.Connectors.Count(c => c.Status == "Quiet");
         }
         catch (Exception ex)
         {
@@ -279,31 +280,38 @@ public class SentinelService
     public const string DataLakeMessage =
         "Not available in data lake tier: last log times can't be read through the Log Analytics query API";
 
+    public const string QuietMessageSuffix = "This connector only sends data when events happen.";
+
     /// <summary>
-    /// Sets Status, GapMinutes and ErrorMessage from the last log time. A connector whose tables
-    /// are all in the data lake tier is Unknown, because its last log time can't be read.
+    /// Sets Status, GapMinutes and ErrorMessage from the newest record in the connector's tables:
+    /// Healthy up to the warning threshold, then Warning, then Error. Event-driven connectors are
+    /// Quiet instead of Warning or Error. A connector whose tables are all in the data lake tier is
+    /// Unknown, because its last log time can't be read.
     /// </summary>
     public static void ApplyHealthStatus(
-        ConnectorHealth health, IReadOnlyDictionary<string, string> tableTiers, int gapThresholdMinutes, DateTime utcNow)
+        ConnectorHealth health, IReadOnlyDictionary<string, string> tableTiers, ConnectorThreshold threshold, DateTime utcNow)
     {
         health.DataLakeTables = health.AssociatedTables.Where(t => TableTiers.IsDataLake(tableTiers, t)).ToList();
+        health.ErrorMessage = null;
 
         if (health.LastLogReceived.HasValue)
         {
-            var gap = (utcNow - health.LastLogReceived.Value).TotalMinutes;
+            var gap = Math.Max(0, (utcNow - health.LastLogReceived.Value).TotalMinutes);
             health.GapMinutes = Math.Round(gap, 1);
 
-            if (gap <= gapThresholdMinutes)
-                health.Status = "Healthy";
-            else if (gap <= gapThresholdMinutes * 2)
+            if (gap <= threshold.WarningAfterMinutes)
             {
-                health.Status = "Warning";
-                health.ErrorMessage = $"No logs received for {Math.Round(gap)} minutes";
+                health.Status = "Healthy";
+            }
+            else if (threshold.EventDriven)
+            {
+                health.Status = "Quiet";
+                health.ErrorMessage = $"No events for {FormatGap(gap)}. {QuietMessageSuffix}";
             }
             else
             {
-                health.Status = "Error";
-                health.ErrorMessage = $"No logs received for {Math.Round(gap)} minutes";
+                health.Status = gap <= threshold.ErrorAfterMinutes ? "Warning" : "Error";
+                health.ErrorMessage = $"No logs received for {FormatGap(gap)}";
             }
         }
         else if (health.AssociatedTables.Count == 0)
@@ -316,12 +324,20 @@ public class SentinelService
             health.Status = "Unknown";
             health.ErrorMessage = DataLakeMessage;
         }
+        else if (threshold.EventDriven)
+        {
+            health.Status = "Quiet";
+            health.ErrorMessage = $"No events in the last 24 hours. {QuietMessageSuffix}";
+        }
         else
         {
             health.Status = "Error";
             health.ErrorMessage = "No logs received in the last 24 hours";
         }
     }
+
+    private static string FormatGap(double minutes) =>
+        minutes < 120 ? $"{Math.Round(minutes)} minutes" : $"{Math.Round(minutes / 60, 1)} hours";
 
     /// <summary>Connector that writes to the given table, if the table is known.</summary>
     public static bool TryMapTableToConnector(string tableName, out (string ConnectorName, string ConnectorType) connector) =>

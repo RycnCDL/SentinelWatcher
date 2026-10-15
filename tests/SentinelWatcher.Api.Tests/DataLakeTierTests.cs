@@ -5,6 +5,8 @@ namespace SentinelWatcher.Api.Tests;
 
 public class DataLakeTierTests
 {
+    private static readonly ConnectorThreshold Default = new(60, 120, EventDriven: false);
+
     private static readonly IReadOnlyDictionary<string, string> Tiers =
         new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
         {
@@ -29,7 +31,7 @@ public class DataLakeTierTests
     {
         var health = new ConnectorHealth { AssociatedTables = { "CommonSecurityLog" } };
 
-        SentinelService.ApplyHealthStatus(health, Tiers, 60, DateTime.UtcNow);
+        SentinelService.ApplyHealthStatus(health, Tiers, Default, DateTime.UtcNow);
 
         Assert.Equal("Unknown", health.Status);
         Assert.StartsWith("Not available in data lake tier", health.ErrorMessage);
@@ -41,7 +43,7 @@ public class DataLakeTierTests
     {
         var health = new ConnectorHealth { AssociatedTables = { "Syslog", "CommonSecurityLog" } };
 
-        SentinelService.ApplyHealthStatus(health, Tiers, 60, DateTime.UtcNow);
+        SentinelService.ApplyHealthStatus(health, Tiers, Default, DateTime.UtcNow);
 
         Assert.Equal("Error", health.Status);
     }
@@ -51,7 +53,7 @@ public class DataLakeTierTests
     {
         var health = new ConnectorHealth { AssociatedTables = { "CommonSecurityLog" } };
 
-        SentinelService.ApplyHealthStatus(health, new Dictionary<string, string>(), 60, DateTime.UtcNow);
+        SentinelService.ApplyHealthStatus(health, new Dictionary<string, string>(), Default, DateTime.UtcNow);
 
         Assert.Equal("Error", health.Status);
         Assert.Empty(health.DataLakeTables);

@@ -5,7 +5,7 @@ public class ConnectorHealth
     public string ConnectorId { get; set; } = string.Empty;
     public string ConnectorName { get; set; } = string.Empty;
     public string ConnectorType { get; set; } = string.Empty;
-    public string Status { get; set; } = "Unknown"; // Healthy, Warning, Error, Unknown
+    public string Status { get; set; } = "Unknown"; // Healthy, Warning, Error, Quiet, Unknown
     public DateTime? LastLogReceived { get; set; }
     public double? GapMinutes { get; set; }
     public string? ErrorMessage { get; set; }
@@ -24,5 +24,8 @@ public class DataConnectorsResponse
     public int HealthyCount { get; set; }
     public int WarningCount { get; set; }
     public int ErrorCount { get; set; }
+
+    /// <summary>Event-driven connectors without recent events (not an error).</summary>
+    public int QuietCount { get; set; }
     public DateTime LastChecked { get; set; }
 }

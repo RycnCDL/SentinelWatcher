@@ -15,6 +15,9 @@ builder.Services.Configure<CacheSettingsConfig>(
     builder.Configuration.GetSection("CacheSettings"));
 builder.Services.Configure<SentinelOptions>(
     builder.Configuration.GetSection(SentinelOptions.SectionName));
+builder.Services.Configure<ConnectorHealthOptions>(
+    builder.Configuration.GetSection(ConnectorHealthOptions.SectionName));
+builder.Services.AddSingleton<ConnectorThresholds>();
 
 // Workspace allow-list (Sentinel:Workspaces): the only workspaces the app reads.
 builder.Services.AddSingleton<WorkspaceRegistry>();

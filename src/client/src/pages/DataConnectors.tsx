@@ -4,6 +4,7 @@ import {
   AlertTriangle,
   XCircle,
   HelpCircle,
+  Moon,
 } from 'lucide-react';
 import { useWorkspace } from '../auth/useWorkspace';
 import { getDataConnectors } from '../services/api';
@@ -27,6 +28,12 @@ const STATUS_CONFIG = {
     color: '#FF4D4D',
     bg: 'rgba(255, 77, 77, 0.12)',
     glow: '0 0 8px rgba(255, 77, 77, 0.4)',
+  },
+  Quiet: {
+    icon: Moon,
+    color: '#8B9BB4',
+    bg: 'rgba(139, 155, 180, 0.12)',
+    glow: '0 0 8px rgba(139, 155, 180, 0.3)',
   },
   Unknown: {
     icon: HelpCircle,
@@ -139,7 +146,7 @@ export default function DataConnectors() {
       </div>
 
       <div className="filter-bar">
-        {['all', 'Healthy', 'Warning', 'Error', 'Unknown'].map((f) => (
+        {['all', 'Healthy', 'Warning', 'Error', 'Quiet', 'Unknown'].map((f) => (
           <button
             key={f}
             className={`filter-btn ${filter === f ? 'active' : ''}`}

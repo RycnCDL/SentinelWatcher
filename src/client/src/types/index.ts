@@ -68,7 +68,8 @@ export interface ConnectorHealth {
   connectorId: string;
   connectorName: string;
   connectorType: string;
-  status: 'Healthy' | 'Warning' | 'Error' | 'Unknown';
+  // Quiet: an event-driven connector without recent events, which is not an error.
+  status: 'Healthy' | 'Warning' | 'Error' | 'Quiet' | 'Unknown';
   lastLogReceived: string | null;
   gapMinutes: number | null;
   errorMessage: string | null;
@@ -81,6 +82,7 @@ export interface DataConnectorsResponse {
   healthyCount: number;
   warningCount: number;
   errorCount: number;
+  quietCount: number;
   lastChecked: string;
 }
 
