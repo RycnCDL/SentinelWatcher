@@ -1,0 +1,15 @@
+<Project>
+  <!--
+    Release builds must not contain local paths: they end up in PDBs and in stack traces in the
+    logs. Map the repository root to /_/ and build deterministically.
+  -->
+  <PropertyGroup Condition="'$(Configuration)' == 'Release'">
+    <Deterministic>true</Deterministic>
+    <PathMap>$(MSBuildThisFileDirectory)=/_/</PathMap>
+  </PropertyGroup>
+
+  <!-- GitHub Actions sets GITHUB_ACTIONS=true. -->
+  <PropertyGroup Condition="'$(GITHUB_ACTIONS)' == 'true'">
+    <ContinuousIntegrationBuild>true</ContinuousIntegrationBuild>
+  </PropertyGroup>
+</Project>
