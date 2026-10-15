@@ -1,0 +1,69 @@
+name: Bug report
+description: Something in SentinelWatcher does not work as documented.
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for the report. Please do not include real tenant IDs, workspace resource IDs, tokens, user names or log data. Placeholders are enough.
+        Security problems go through private reporting, see SECURITY.md.
+
+  - type: input
+    id: version
+    attributes:
+      label: SentinelWatcher version
+      description: Release tag, or the commit if you built it yourself.
+      placeholder: v0.1.0
+    validations:
+      required: true
+
+  - type: dropdown
+    id: hosting
+    attributes:
+      label: How do you run it?
+      options:
+        - Azure App Service deployed with the Bicep template or Deploy to Azure
+        - Azure App Service deployed another way
+        - Locally (dotnet run and npm run dev)
+        - Other
+    validations:
+      required: true
+
+  - type: dropdown
+    id: portal
+    attributes:
+      label: Where is the workspace managed?
+      options:
+        - Onboarded to the Microsoft Defender portal
+        - Azure portal only
+        - Not sure
+    validations:
+      required: true
+
+  - type: input
+    id: page
+    attributes:
+      label: Affected page or endpoint
+      placeholder: Collection Rules, /api/dcr
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: Include the steps to reproduce it.
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: What did you expect?
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: API log output
+      description: From az webapp log tail or the local console. Remove IDs, names and other customer data first.
+      render: text

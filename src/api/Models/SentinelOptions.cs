@@ -1,0 +1,28 @@
+namespace SentinelWatcher.Api.Models;
+
+/// <summary>
+/// Bound from the "Sentinel" configuration section.
+/// </summary>
+public class SentinelOptions
+{
+    public const string SectionName = "Sentinel";
+
+    /// <summary>
+    /// Allow-list of Log Analytics workspace resource IDs, for example
+    /// /subscriptions/{id}/resourceGroups/{rg}/providers/Microsoft.OperationalInsights/workspaces/{name}.
+    /// This list is the only source of workspaces: requests for any other workspace are rejected.
+    /// </summary>
+    public List<string> Workspaces { get; set; } = new();
+
+    /// <summary>
+    /// Client ID of the user-assigned managed identity used for all Azure calls.
+    /// When empty, developer sign-in is used (Azure CLI first; see AzureCredentialFactory).
+    /// </summary>
+    public string? ManagedIdentityClientId { get; set; }
+
+    /// <summary>
+    /// Shows the Data Collection Rules page. When false, /api/dcr returns 404, the client hides
+    /// the page, and the identity needs no access to Microsoft.Insights/dataCollectionRules.
+    /// </summary>
+    public bool EnableDcrPage { get; set; } = true;
+}

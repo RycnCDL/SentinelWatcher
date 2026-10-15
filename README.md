@@ -1,386 +1,161 @@
-# Sentinel Watcher
+# SentinelWatcher
 
-[![.NET](https://img.shields.io/badge/.NET-8.0-purple.svg)](https://dotnet.microsoft.com/)
-[![Blazor](https://img.shields.io/badge/Blazor-Server-blue.svg)](https://dotnet.microsoft.com/apps/aspnet/web-apps/blazor)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![Azure](https://img.shields.io/badge/Azure-Sentinel-0078D4.svg)](https://azure.microsoft.com/services/microsoft-sentinel/)
+SentinelWatcher is a web dashboard that shows the health and usage of a Microsoft Sentinel workspace: analytics rules and their incidents, log ingestion and cost, data freshness, data collection rules and Sentinel health events. It is for management, security leads and anyone else who should see these insights without being assigned a security role or activating one through PIM. Viewers only need an Entra app role; the app reads Azure with its own managed identity.
 
-> **Real-time health monitoring and vulnerability tracking for Microsoft Sentinel workspaces.**
+<!-- Screenshot: add docs/images/dashboard.png, then replace the next line with
+     ![SentinelWatcher dashboard](docs/images/dashboard.png) -->
+*Screenshot coming soon.*
 
-## 🎯 Purpose
+## Features
 
-SOC teams and Sentinel administrators need continuous visibility into:
-- **Health Trends**: Is my Sentinel environment degrading over time?
-- **Rule Effectiveness**: Which analytics rules are most/least active?
-- **Connector Status**: Are all data sources sending logs as expected?
-- **Vulnerability Exposure**: Is my environment vulnerable to newly disclosed CVEs?
+- **Dashboard:** rules, incidents, ingestion volume and cost, data freshness and DCR status at a glance.
+- **Analytics Rules:** incidents of the last 30 days per rule, and where every incident comes from: existing rules, rules that no longer exist, or no analytics rule (for example Microsoft Defender XDR).
+- **Log Ingestion:** billable volume and estimated cost per table over 30 days, with estimated volumes and data lake tier tables labeled.
+- **Data Connectors (data freshness):** whether each connector's tables receive data, with gap thresholds per connector type and a Quiet state for event-driven connectors.
+- **Collection Rules:** data collection rules in the workspace resource group and whether their destination tables receive data. Can be turned off.
+- **Sentinel Health (connector health):** health score, failed rule and automation runs, auto-disabled rules, and the latest connector status from `SentinelHealth`.
+- **No Azure role for viewers:** access through the Entra app role `SentinelWatcher.Viewer` with "Assignment required".
+- **Locked down:** a workspace allow-list, fixed queries only, least-privilege roles for the managed identity, no client secret.
 
-Sentinel Watcher provides a real-time dashboard addressing all these needs in one place.
+SentinelWatcher only uses **Azure Resource Manager** and the **Log Analytics query API**. It works the same for workspaces managed in the Azure portal and workspaces onboarded to the Microsoft Defender portal.
 
-## ✨ Features
+## Architecture
 
-### 📊 Health Dashboard
-- **Overall health score** (0-100) with weighted category breakdown
-- **30-day trend chart** showing health over time
-- **Real-time updates** via SignalR (live dashboard)
-- **Multi-workspace support** (track multiple Sentinel instances)
-- **Automated assessments** (configurable schedule)
+```mermaid
+flowchart LR
+    user["Viewer<br/>(browser)"]
+    entra["Microsoft Entra ID<br/>app role SentinelWatcher.Viewer"]
+    web["Azure App Service<br/>API + web app (.NET 10, React)"]
+    mi["User-assigned<br/>managed identity"]
+    law["Log Analytics workspace<br/>with Microsoft Sentinel"]
+    arm["Azure Resource Manager<br/>Sentinel config, tables, DCRs"]
 
-### 🔍 Analytics Rules Tracking
-- **Top 10/20 rules** by alert/incident count
-- **Activity timeline** for each rule
-- **Effectiveness metrics** (alerts → incidents conversion)
-- **Identify silent rules** (rules not triggering)
-
-### 🔌 Data Connector Health
-- **Connector status grid** (connected vs. disconnected)
-- **Last data received** timestamp per connector
-- **Data volume tracking** (optional)
-- **Historical trends** (when did connector stop sending data?)
-
-### 🛡️ CVE Tracking & Exposure Checking
-- **CISA KEV catalog** integration (Known Exploited Vulnerabilities)
-- **Microsoft Security Response Center (MSRC)** integration
-- **Automatic KQL query generation** for CVE exposure checks
-- **One-click exposure verification** against your Sentinel data
-- **Remediation tracking** (mark CVEs as patched)
-
-### 🚨 Alerting
-- **Email notifications** (SMTP)
-- **Webhook integration** (Microsoft Teams, Slack)
-- **Alert on health degradation** (configurable thresholds)
-- **Alert on new CVE matches**
-
-## 🏗️ Architecture
-
-```
-┌─────────────────────────────────────────────────────────┐
-│                    Blazor Server UI                     │
-│  (Real-time dashboard with SignalR push updates)        │
-└─────────────────────────────────────────────────────────┘
-                          ↓
-┌─────────────────────────────────────────────────────────┐
-│              ASP.NET Core 8.0 API Layer                 │
-│  /api/health, /api/analytics, /api/connectors, /api/cve│
-└─────────────────────────────────────────────────────────┘
-                          ↓
-┌─────────────────────────────────────────────────────────┐
-│          Business Logic (SentinelWatcher.Core)          │
-│  AssessmentService, AnalyticsService, CveService, etc.  │
-└─────────────────────────────────────────────────────────┘
-                          ↓
-┌─────────────────────────────────────────────────────────┐
-│        Data Layer (Azure SQL Database / SQLite)         │
-│  AssessmentHistory, RuleActivity, ConnectorHealth, CVEs │
-└─────────────────────────────────────────────────────────┘
-                          ↓
-┌─────────────────────────────────────────────────────────┐
-│               Background Workers                        │
-│  HealthCheckWorker (periodic), CveFetchWorker (daily)   │
-└─────────────────────────────────────────────────────────┘
-                          ↓
-┌─────────────────────────────────────────────────────────┐
-│                   External APIs                         │
-│  Azure Monitor, CISA KEV, MSRC, Sentinel APIs          │
-└─────────────────────────────────────────────────────────┘
+    user -- sign in --> entra
+    user -- "API calls with token" --> web
+    web -- "validates token and role" --> entra
+    web -. uses .-> mi
+    mi -- "fixed KQL queries" --> law
+    mi -- "read" --> arm
 ```
 
-## 🚀 Quick Start
+More in [Architecture](docs/architecture.md).
 
-### Prerequisites
+## Prerequisites
 
-- **.NET 8.0 SDK** ([Download](https://dotnet.microsoft.com/download))
-- **SQL Server** (Azure SQL, SQL Express, or SQLite)
-- **Azure AD App Registration** (for Sentinel API access)
-- **Azure Sentinel workspace** (with Reader permissions)
+- A Log Analytics workspace with Microsoft Sentinel.
+- Entra ID: Application Administrator or Cloud Application Administrator, to create the app registration.
+- Azure: Contributor on a resource group for the app, and Owner or User Access Administrator on the resource group of the workspace.
+- Azure Cloud Shell (Bash), or the Azure CLI and Bash locally.
 
-### Installation
+## Deploy to Azure
 
-#### Option 1: Deploy to Azure App Service
+1. Choose an app name. The app will run at `https://<appName>.azurewebsites.net`.
+2. Create the app registration in [Azure Cloud Shell](https://shell.azure.com) (Bash) and note the client ID it prints:
 
-[![Deploy to Azure](https://aka.ms/deploytoazurebutton)](https://portal.azure.com/#create/Microsoft.Template/uri/https%3A%2F%2Fraw.githubusercontent.com%2FRycnCDL%2FSentinelWatcher%2Fmain%2Fazuredeploy.json)
+   ```bash
+   git clone https://github.com/RycnCDL/SentinelWatcher.git && cd SentinelWatcher
+   bash scripts/setup-app-registration.sh --redirect-uri https://<appName>.azurewebsites.net --assign-me
+   ```
 
-#### Option 2: Run Locally
+3. Deploy, entering the client ID, the workspace resource ID and the app name:
+
+   [![Deploy to Azure](https://aka.ms/deploytoazurebutton)](https://portal.azure.com/#create/Microsoft.Template/uri/https%3A%2F%2Fraw.githubusercontent.com%2FRycnCDL%2FSentinelWatcher%2Fmain%2Finfra%2Fazuredeploy.json)
+
+4. Wait about five minutes for the role assignments, restart the app once, and open it.
+5. Assign the **SentinelWatcher Viewer** role to the people or groups who should see it: Entra admin center, Enterprise applications, SentinelWatcher, Users and groups.
+
+## Manual deployment
+
+With the Azure CLI, after step 2 above:
 
 ```bash
-# Clone repository
-git clone https://github.com/RycnCDL/SentinelWatcher.git
-cd SentinelWatcher
-
-# Restore dependencies
-dotnet restore
-
-# Update connection string
-# Edit src/SentinelWatcher.Web/appsettings.json
-
-# Run migrations
-cd src/SentinelWatcher.Web
-dotnet ef database update
-
-# Run application
-dotnet run
-# Navigate to https://localhost:5001
+az group create -n rg-sentinelwatcher -l westeurope
+az deployment group create -g rg-sentinelwatcher -n sentinelwatcher \
+  --template-file infra/main.bicep \
+  --parameters appName=<appName> entraClientId=<client-id> \
+               workspaceResourceId=<workspace-resource-id> \
+               packageUrl=https://github.com/RycnCDL/SentinelWatcher/releases/download/v0.1.0/sentinelwatcher.zip
+az webapp restart -g rg-sentinelwatcher -n <appName>
 ```
 
-#### Option 3: Docker
+The full guide, including how to check the assigned roles, update, and uninstall, is in [Installation](docs/installation.md).
 
-```bash
-# Build image
-docker build -t sentinelwatcher .
+## Configuration
 
-# Run container
-docker run -p 8080:80 \
-  -e ConnectionStrings__DefaultConnection="Server=..." \
-  -e AzureAd__ClientId="..." \
-  -e AzureAd__ClientSecret="..." \
-  sentinelwatcher
-```
+The template sets everything required. The most important settings:
 
-### Azure AD Configuration
+| Setting | Default | Description |
+|---------|---------|-------------|
+| `AzureAd:TenantId`, `AzureAd:ClientId` | | App registration used for sign-in |
+| `Sentinel:Workspaces` | | Allow-list of workspace resource IDs. Other workspaces get 403. |
+| `Sentinel:ManagedIdentityClientId` | | Managed identity for Azure calls. Empty: developer sign-in such as `az login` (local development). |
+| `Sentinel:EnableDcrPage` | `true` | Collection Rules page. `false` hides it and needs no DCR access. |
+| `ConnectorHealth:WarningAfterMinutes`, `ErrorAfterMinutes` | `60`, `120` | Data freshness thresholds, with overrides per connector type |
+| `CacheSettings:HeavyQueryRefreshMinutes` | `10` | Cache refresh interval |
+| `CacheSettings:ErrorRetrySeconds` | `30` | Retry interval for sections that failed to load |
+| `CacheSettings:CostPerGBDollars` | `2.76` | Price per GB for the cost estimate |
 
-1. **Create App Registration** in Azure AD
-2. **API Permissions**: Add the following:
-   - `Microsoft.SecurityInsights` (Read)
-   - `Microsoft.OperationalInsights` (Read)
-3. **Client Secret**: Generate and save securely
-4. **Update appsettings.json**:
+In App Service, use `__` instead of `:` (for example `Sentinel__EnableDcrPage`). All settings and template parameters: [Configuration](docs/configuration.md).
 
-```json
-{
-  "AzureAd": {
-    "Instance": "https://login.microsoftonline.com/",
-    "TenantId": "your-tenant-id",
-    "ClientId": "your-app-id",
-    "ClientSecret": "your-secret"
-  }
-}
-```
+## Permissions
 
-## 📖 Documentation
+| Who | Needs | Why |
+|-----|-------|-----|
+| Viewers | App role `SentinelWatcher.Viewer` | Controls who can sign in and call the API. No Azure role: the app reads Azure with its own identity. |
+| Managed identity | Microsoft Sentinel Reader on the workspace resource group | Log Analytics queries, Sentinel analytics rules, data connectors and onboarding state, table plans. Resource group scope because the SecurityInsights solution is a sibling of the workspace, not a child. |
+| Managed identity | Custom role with only `Microsoft.Insights/dataCollectionRules/read` on the workspace resource group | Collection Rules page. Monitoring Reader is an optional fallback where custom roles are not allowed; nothing is assigned when the page is off. |
 
-### Adding a Workspace
+Log Analytics Reader is not needed. Microsoft Sentinel Reader can read every workspace in the resource group and allows a few actions beyond reading, so keep the Sentinel workspace in a **dedicated resource group**. Details: [Permissions](docs/permissions.md) and [Security model](docs/security-model.md).
 
-1. Navigate to **Workspaces** page
-2. Click **+ Add Workspace**
-3. Authenticate with Azure (device code or interactive)
-4. Select Subscription → Resource Group → Workspace
-5. Workspace appears in dashboard
+## Troubleshooting
 
-### Running Manual Assessment
+| Symptom | Fix |
+|---------|-----|
+| AADSTS50105 at sign-in | Assign the SentinelWatcher Viewer role to the user or a group |
+| "Need admin approval" | Grant admin consent: App registrations, SentinelWatcher, API permissions |
+| Empty pages or "Data is still loading" | Wait for the role assignments, restart the app, check `az webapp log tail` for `AuthorizationFailed` |
+| 403 "This workspace is not configured" | Add the workspace to `Sentinel:Workspaces` |
+| A DCR shows Error | The log names the destination table without data in the last 24 hours |
+| "Could not load data, see server log" | The API could not read Azure. The code says why (for example `AuthenticationFailed`, `AccessDenied`); the server log has the details |
 
-1. Select workspace from dropdown
-2. Click **⚡ Run Assessment Now**
-3. Wait 2-5 minutes for completion
-4. View results in dashboard
+More in [Troubleshooting](docs/troubleshooting.md) and the [FAQ](docs/faq.md).
 
-### Checking CVE Exposure
+## Compatibility
 
-1. Navigate to **Vulnerabilities** page
-2. Browse CISA KEV or MSRC tabs
-3. Click **Check Exposure** on any CVE
-4. View KQL query and results
-5. Mark as remediated if patched
+| Component | Tested with |
+|-----------|-------------|
+| .NET | .NET 10 (SDK 10.0.402); App Service runtime `DOTNETCORE\|10.0` on Linux |
+| Node.js (build only) | 22.20.0; minimum 22.20, supported `^22.20.0 \|\| ^24.12.0 \|\| >=26.0.0` |
+| Microsoft Defender portal | Tested with a workspace onboarded to the Defender portal (October 2026) |
+| Azure portal | Uses the same ARM and Log Analytics APIs; a workspace managed only in the Azure portal was not tested separately for 0.1.0 |
 
-### Configuring Alerts
+SentinelWatcher does not depend on either portal. Microsoft is retiring the Sentinel experience in the Azure portal (end of March 2027), which does not affect SentinelWatcher.
 
-1. Navigate to **Alerts** page
-2. Click **+ New Alert**
-3. Select alert type (Health Degradation, CVE Match, etc.)
-4. Set threshold (e.g., score drops below 70)
-5. Add email recipients or webhook URL
-6. Save
+### Known issues
 
-## 🔧 Configuration
+- **DCRs outside the workspace resource group** are not listed on the Collection Rules page.
+- **Incident counts in Defender-onboarded workspaces:** incidents created by Microsoft Defender XDR have no analytics rule and are listed as "Defender XDR / no analytics rule". Counts are distinct incidents by creation time over 30 days; queries that count `SecurityIncident` rows count updates and give higher numbers.
+- **Fusion rule in Defender-onboarded workspaces:** the Defender portal does not list the Fusion rule (Advanced Multistage Attack Detection), because Defender XDR correlation replaces it. The `alertRules` API still returns it, so SentinelWatcher counts it and shows one rule more than the Defender portal. The app does not mark it, since onboarding to the Defender portal can't be detected through a documented API. See the [FAQ](docs/faq.md#why-does-sentinelwatcher-show-one-more-rule-than-the-defender-portal).
+- **Custom detection rules** created in the Defender portal (Advanced Hunting) are not returned by the Sentinel `alertRules` API and are not listed. The Microsoft Graph API for them is in beta (October 2026).
+- **Data lake tier tables** can't be read through the Log Analytics query API and show as "Not available in data lake tier". They are detected by the `Auxiliary` table plan; this was confirmed through the tables API, not yet against the Defender portal tier view. Their cost estimate uses the analytics price.
+- **Connector health staleness:** Sentinel logs connector health events mainly on status changes and while failing, so a connector that has been healthy for a long time can show as stale on the Sentinel Health page.
+- The template configures **one workspace**; more can be added in the app settings.
+- Freshness of tables outside the built-in list (for example custom tables) comes from the hourly `Usage` table and is approximate.
 
-### appsettings.json
+## Roadmap
 
-```json
-{
-  "ConnectionStrings": {
-    "DefaultConnection": "Server=localhost;Database=SentinelWatcher;Integrated Security=true;"
-  },
-  "AzureAd": {
-    "TenantId": "common",
-    "ClientId": "your-client-id",
-    "ClientSecret": "your-client-secret"
-  },
-  "Sentinel": {
-    "AssessmentScheduleCron": "0 */6 * * *",  // Every 6 hours
-    "CveSyncScheduleCron": "0 2 * * *"         // Daily at 2 AM
-  },
-  "Smtp": {
-    "Host": "smtp.office365.com",
-    "Port": 587,
-    "Username": "alerts@yourcompany.com",
-    "EnableSsl": true
-  }
-}
-```
+Planned for v0.2:
 
-### Background Worker Schedules
+- Custom detection rules through the Microsoft Graph security API (`/security/rules/detectionRules`, beta as of October 2026).
+- Better handling of data lake tier tables.
+- An optional custom role with only the actions SentinelWatcher needs, replacing Microsoft Sentinel Reader.
+- Data collection rules outside the workspace resource group.
+- Several workspaces in the template.
 
-| Worker | Default Schedule | Purpose |
-|--------|-----------------|---------|
-| HealthCheckWorker | Every 6 hours | Run health assessments |
-| CveFetchWorker | Daily at 2 AM UTC | Fetch CISA KEV + MSRC updates |
-| AlertWorker | Every 5 minutes | Check alert conditions |
+## Contributing and security
 
-## 📊 Database Schema
+See [CONTRIBUTING.md](CONTRIBUTING.md). Report vulnerabilities privately as described in [SECURITY.md](SECURITY.md). Changes are listed in [CHANGELOG.md](CHANGELOG.md).
 
-```sql
--- Workspaces
-CREATE TABLE Workspaces (
-    Id INT PRIMARY KEY IDENTITY,
-    WorkspaceName NVARCHAR(200),
-    SubscriptionId UNIQUEIDENTIFIER,
-    WorkspaceId UNIQUEIDENTIFIER UNIQUE
-);
+## License
 
--- Assessment History (Time-series)
-CREATE TABLE AssessmentHistory (
-    Id BIGINT PRIMARY KEY IDENTITY,
-    WorkspaceId INT,
-    AssessmentDate DATETIME2,
-    OverallScore DECIMAL(5,2),
-    CategoryScoresJson NVARCHAR(MAX)
-);
-
--- Top Rules
-CREATE TABLE RuleActivity (
-    Id BIGINT PRIMARY KEY IDENTITY,
-    WorkspaceId INT,
-    RuleName NVARCHAR(500),
-    AlertCount INT,
-    IncidentCount INT,
-    RecordedAt DATETIME2
-);
-
--- Connector Health
-CREATE TABLE ConnectorHealth (
-    Id BIGINT PRIMARY KEY IDENTITY,
-    WorkspaceId INT,
-    ConnectorName NVARCHAR(200),
-    IsConnected BIT,
-    LastDataReceivedAt DATETIME2
-);
-
--- CVE Database
-CREATE TABLE CveDatabase (
-    Id INT PRIMARY KEY IDENTITY,
-    CveId NVARCHAR(50) UNIQUE,
-    Severity NVARCHAR(20),
-    IsCisaKev BIT,
-    KqlQuery NVARCHAR(MAX)
-);
-
--- CVE Matches
-CREATE TABLE CveMatches (
-    Id BIGINT PRIMARY KEY IDENTITY,
-    WorkspaceId INT,
-    CveId NVARCHAR(50),
-    IsExposed BIT,
-    MatchedAt DATETIME2
-);
-```
-
-## 🎨 Screenshots
-
-### Dashboard
-![Health Dashboard](docs/images/dashboard.png)
-
-### Analytics Rules
-![Top Rules](docs/images/analytics.png)
-
-### CVE Tracking
-![CVE Exposure Check](docs/images/cve-tracking.png)
-
-## 🐛 Troubleshooting
-
-### "Unauthorized" Error
-
-```bash
-# Verify Azure AD permissions
-az ad app permission list --id <app-id>
-
-# Ensure Reader role on workspace
-az role assignment list --scope /subscriptions/.../workspaces/...
-```
-
-### Database Connection Failed
-
-```bash
-# Test connection string
-dotnet ef dbcontext info
-```
-
-### Background Worker Not Running
-
-```bash
-# Check worker logs
-docker logs <container-id> --tail 100
-```
-
-## 🔐 Security Best Practices
-
-- ✅ Store Client Secret in **Azure Key Vault** (not appsettings.json)
-- ✅ Enable **Azure AD authentication** for web app users
-- ✅ Use **Managed Identity** when running in Azure
-- ✅ Restrict API access with **IP allowlisting**
-- ✅ Enable **Application Insights** for monitoring
-
-## 🚀 Deployment
-
-### Azure App Service
-
-```bash
-# Publish to Azure
-az webapp up --name sentinelwatcher --resource-group rg-sentinel --runtime "DOTNETCORE:8.0"
-
-# Configure app settings
-az webapp config appsettings set --name sentinelwatcher --resource-group rg-sentinel \
-  --settings "AzureAd__ClientSecret=@Microsoft.KeyVault(SecretUri=https://...)"
-```
-
-### Docker Compose
-
-```yaml
-version: '3.8'
-services:
-  web:
-    image: sentinelwatcher:latest
-    ports:
-      - "8080:80"
-    environment:
-      - ConnectionStrings__DefaultConnection=Server=sqlserver;...
-    depends_on:
-      - sqlserver
-
-  sqlserver:
-    image: mcr.microsoft.com/mssql/server:2022-latest
-    environment:
-      - SA_PASSWORD=YourStrong!Passw0rd
-```
-
-## 🤝 Contributing
-
-Contributions welcome! See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
-
-## 📜 License
-
-MIT License - see [LICENSE](LICENSE) file
-
-## 🙏 Acknowledgments
-
-- Inspired by SOC operational challenges
-- Built on Microsoft Azure SDK
-- CVE data from CISA and MSRC
-
-## 📧 Support
-
-- **Issues**: [GitHub Issues](https://github.com/RycnCDL/SentinelWatcher/issues)
-- **Discussions**: [GitHub Discussions](https://github.com/RycnCDL/SentinelWatcher/discussions)
-- **Author**: [@RycnCDL](https://github.com/RycnCDL)
-
----
-
-**⭐ If this tool helps your SOC operations, please star the repo!**
+[MIT](LICENSE), copyright Phillipe Chaves de Lima.
