@@ -15,6 +15,7 @@ import {
 import { useWorkspace } from '../auth/useWorkspace';
 import { getIngestion, getDataConnectors } from '../services/api';
 import type { IngestionResponse, DataConnectorsResponse } from '../types';
+import { formatGb, formatNumber, formatUsd } from '../utils/format';
 
 const COLORS = [
   '#3B82F6', '#00D154', '#F59E0B', '#FF4D4D', '#a855f7',
@@ -27,7 +28,7 @@ const COLORS = [
 // Only show label for large enough slices
 function renderLabel({ name, percent }: { name?: string; percent?: number }) {
   if ((percent ?? 0) < 0.05) return null;
-  return `${name} (${((percent ?? 0) * 100).toFixed(1)}%)`;
+  return `${name} (${formatNumber((percent ?? 0) * 100, 1)}%)`;
 }
 
 // Custom compact legend
@@ -38,7 +39,7 @@ function CustomLegend({ data, colors }: { data: { name: string; value: number }[
         <div key={entry.name} className="pie-legend__item">
           <span className="pie-legend__dot" style={{ background: colors[index % colors.length] }} />
           <span className="pie-legend__name">{entry.name}</span>
-          <span className="pie-legend__value">{entry.value.toFixed(2)} GB</span>
+          <span className="pie-legend__value">{formatGb(entry.value)}</span>
         </div>
       ))}
     </div>
@@ -102,7 +103,7 @@ export default function Ingestion() {
   // Tables without Usage data have an estimated volume (record count x 1 KB), not a measured one.
   const estimatedTables = new Set(filteredTables.filter((t) => t.isEstimated).map((t) => t.tableName));
   const formatGB = (value: unknown, _name: unknown, item: { payload?: { name?: string } }) => {
-    const gb = typeof value === 'number' ? `${value.toFixed(2)} GB` : '0 GB';
+    const gb = typeof value === 'number' ? formatGb(value) : formatGb(0);
     return estimatedTables.has(item.payload?.name ?? '') ? `${gb} (estimated)` : gb;
   };
 
@@ -114,8 +115,8 @@ export default function Ingestion() {
       <div className="page-header">
         <h2 className="page-title">Log Ingestion</h2>
         <span className="meta-text">
-          {data.daysAnalyzed} days | Total: {data.totalVolumeGB.toFixed(1)} GB |
-          Est. Cost: ${data.totalEstimatedCostUSD.toFixed(2)} |
+          {data.daysAnalyzed} days | Total: {formatGb(data.totalVolumeGB)} |
+          Est. Cost: {formatUsd(data.totalEstimatedCostUSD)} |
           Last refresh: {new Date(data.lastRefreshed).toLocaleTimeString()}
         </span>
       </div>
@@ -148,8 +149,8 @@ export default function Ingestion() {
         <div className="section ingestion-summary">
           <span className="meta-text">
             Showing <strong style={{ color: 'var(--text-primary)' }}>{filteredTables.length}</strong> tables &nbsp;|&nbsp;
-            Volume: <strong style={{ color: 'var(--text-primary)' }}>{filteredTotal.toFixed(2)} GB</strong> &nbsp;|&nbsp;
-            Est. Cost: <strong style={{ color: 'var(--text-primary)' }}>${filteredCost.toFixed(2)}</strong>
+            Volume: <strong style={{ color: 'var(--text-primary)' }}>{formatGb(filteredTotal)}</strong> &nbsp;|&nbsp;
+            Est. Cost: <strong style={{ color: 'var(--text-primary)' }}>{formatUsd(filteredCost)}</strong>
           </span>
         </div>
       )}
@@ -255,10 +256,10 @@ export default function Ingestion() {
                         </span>
                       )}
                     </td>
-                    <td className="text-right">{t.volumeMB.toLocaleString()}</td>
-                    <td className="text-right">{t.volumeGB.toFixed(2)}</td>
-                    <td className="text-right">{t.dailyAverageMB.toLocaleString()}</td>
-                    <td className="text-right">${t.estimatedCostUSD.toFixed(2)}</td>
+                    <td className="text-right">{formatNumber(t.volumeMB)}</td>
+                    <td className="text-right">{formatNumber(t.volumeGB)}</td>
+                    <td className="text-right">{formatNumber(t.dailyAverageMB)}</td>
+                    <td className="text-right">{formatUsd(t.estimatedCostUSD)}</td>
                   </tr>
                 ))}
               </tbody>
@@ -266,14 +267,14 @@ export default function Ingestion() {
                 <tr>
                   <td><strong>Total</strong></td>
                   <td className="text-right">
-                    <strong>{filteredTables.reduce((s, t) => s + t.volumeMB, 0).toLocaleString()}</strong>
+                    <strong>{formatNumber(filteredTables.reduce((s, t) => s + t.volumeMB, 0))}</strong>
                   </td>
                   <td className="text-right">
-                    <strong>{filteredTotal.toFixed(2)}</strong>
+                    <strong>{formatNumber(filteredTotal)}</strong>
                   </td>
                   <td className="text-right">-</td>
                   <td className="text-right">
-                    <strong>${filteredCost.toFixed(2)}</strong>
+                    <strong>{formatUsd(filteredCost)}</strong>
                   </td>
                 </tr>
               </tfoot>

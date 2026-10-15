@@ -13,6 +13,7 @@ import { getAnalyticsRules, getIngestion, getDataConnectors, getDcr } from '../s
 import type { AnalyticsRulesResponse, IngestionResponse, DataConnectorsResponse, DcrResponse } from '../types';
 import { useChartTheme } from '../hooks/useTheme';
 import { isDcrPageEnabled } from '../config/runtimeConfig';
+import { formatGb, formatUsd } from '../utils/format';
 
 const SEVERITY_COLORS: Record<string, string> = {
   High:          '#ef4444',
@@ -136,8 +137,8 @@ export default function Dashboard() {
         />
         <StatusCard
           title="Log Ingestion (30d)"
-          value={`${ingestion?.totalVolumeGB?.toFixed(1) ?? '-'} GB`}
-          subtitle={`Est. $${ingestion?.totalEstimatedCostUSD?.toFixed(2) ?? '-'} · ${ingestion?.tables?.length ?? 0} tables`}
+          value={formatGb(ingestion?.totalVolumeGB, 1)}
+          subtitle={`Est. ${formatUsd(ingestion?.totalEstimatedCostUSD)} · ${ingestion?.tables?.length ?? 0} tables`}
           icon={<Database size={24} />}
           color="purple"
         />
@@ -197,16 +198,16 @@ export default function Dashboard() {
                 </h3>
                 <div style={{ display: 'flex', gap: '1.2rem', fontSize: '0.78rem', color: 'var(--text-muted)' }}>
                   <span>{ingestion?.tables?.length ?? 0} tables tracked</span>
-                  <span>Total: <strong style={{ color: 'var(--text-primary)' }}>${ingestion?.totalEstimatedCostUSD?.toFixed(2)}</strong></span>
+                  <span>Total: <strong style={{ color: 'var(--text-primary)' }}>{formatUsd(ingestion?.totalEstimatedCostUSD)}</strong></span>
                 </div>
               </div>
               <ResponsiveContainer width="100%" height={240}>
                 <BarChart data={topCostTables} layout="vertical" margin={{ top: 0, right: 60, left: 10, bottom: 0 }}>
-                  <XAxis type="number" stroke={chart.axisStroke} tick={{ fill: chart.axisTickFill, fontSize: 11 }} tickFormatter={v => `$${v}`} />
+                  <XAxis type="number" stroke={chart.axisStroke} tick={{ fill: chart.axisTickFill, fontSize: 11 }} tickFormatter={v => formatUsd(Number(v))} />
                   <YAxis type="category" dataKey="name" width={160} stroke={chart.axisStroke} tick={{ fill: chart.axisTickFill, fontSize: 11 }} />
                   <Tooltip
                     contentStyle={chart.tooltipStyle}
-                    formatter={(v, _n, props) => [`$${v ?? 0} · ${props?.payload?.gb ?? 0} GB`, 'Est. Cost']}
+                    formatter={(v, _n, props) => [`${formatUsd(Number(v ?? 0))} · ${formatGb(Number(props?.payload?.gb ?? 0))}`, 'Est. Cost']}
                   />
                   <Bar dataKey="cost" fill="var(--accent)" radius={[0, 4, 4, 0]} maxBarSize={26} />
                 </BarChart>
@@ -323,7 +324,7 @@ export default function Dashboard() {
               {[
                 { icon: <ShieldCheck size={14} />, label: 'Rules with incidents',  value: analytics ? (analytics.incidentsLoaded ? rulesWithIncidents : '…') : '-', color: rulesWithIncidents > 0 ? 'var(--warning)' : 'var(--healthy)' },
                 { icon: <Activity     size={14} />, label: 'Total incidents (30d)', value: analytics?.totalIncidents ?? '-', color: (analytics?.totalIncidents ?? 0) > 0 ? 'var(--warning)' : 'var(--text-primary)' },
-                { icon: <TrendingUp   size={14} />, label: 'Daily avg ingestion',   value: ingestion ? `${(ingestion.totalVolumeGB / (ingestion.daysAnalyzed || 30)).toFixed(2)} GB` : '-', color: 'var(--text-primary)' },
+                { icon: <TrendingUp   size={14} />, label: 'Daily avg ingestion',   value: ingestion ? formatGb(ingestion.totalVolumeGB / (ingestion.daysAnalyzed || 30)) : '-', color: 'var(--text-primary)' },
                 { icon: <Database     size={14} />, label: 'Ingestion tables',      value: ingestion?.tables?.length ?? '-', color: 'var(--text-primary)' },
               ].map(s => (
                 <div key={s.label} style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', fontSize: '0.82rem' }}>
