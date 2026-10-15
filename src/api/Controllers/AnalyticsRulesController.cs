@@ -24,10 +24,7 @@ public class AnalyticsRulesController : WorkspaceControllerBase
         await _cacheManager.EnsureDataAvailableAsync(ws, HttpContext.RequestAborted);
 
         var entry = _cacheManager.GetOrCreateEntry(ws);
-        if (entry.AnalyticsRules == null)
-            return StatusCode(503, new { message = "Data is still loading. Please try again shortly." });
-
-        return Ok(entry.AnalyticsRules);
+        return Section(entry.AnalyticsRules, entry.AnalyticsRulesError);
     }
 
     [HttpPost("refresh")]

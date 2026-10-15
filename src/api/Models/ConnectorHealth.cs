@@ -28,4 +28,10 @@ public class DataConnectorsResponse
     /// <summary>Event-driven connectors without recent events (not an error).</summary>
     public int QuietCount { get; set; }
     public DateTime LastChecked { get; set; }
+
+    /// <summary>Set when part of the data could not be read, so the list may be incomplete.</summary>
+    public LoadError? PartialError { get; set; }
+
+    /// <summary>Set when the latest refresh failed and this is older data.</summary>
+    public LoadError? RefreshError { get; set; }
 }

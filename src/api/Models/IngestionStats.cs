@@ -26,4 +26,10 @@ public class IngestionResponse
     public double TotalEstimatedCostUSD { get; set; }
     public int DaysAnalyzed { get; set; }
     public DateTime LastRefreshed { get; set; }
+
+    /// <summary>Set when part of the data could not be read (the rest is valid).</summary>
+    public LoadError? PartialError { get; set; }
+
+    /// <summary>Set when the latest refresh failed and this is older data.</summary>
+    public LoadError? RefreshError { get; set; }
 }

@@ -24,9 +24,6 @@ public class DataConnectorsController : WorkspaceControllerBase
         await _cacheManager.EnsureDataAvailableAsync(ws, HttpContext.RequestAborted);
 
         var entry = _cacheManager.GetOrCreateEntry(ws);
-        if (entry.Connectors == null)
-            return StatusCode(503, new { message = "Data is still loading. Please try again shortly." });
-
-        return Ok(entry.Connectors);
+        return Section(entry.Connectors, entry.ConnectorsError);
     }
 }

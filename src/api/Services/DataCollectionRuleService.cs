@@ -66,7 +66,9 @@ public class DataCollectionRuleService
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
-            _logger.LogError(ex, "Failed to get DCR status");
+            // An empty list would read as "no DCRs" or "all receiving data".
+            _logger.LogError(ex, "Failed to get DCR status for workspace {Workspace}", workspace.WorkspaceName);
+            throw;
         }
 
         return response;

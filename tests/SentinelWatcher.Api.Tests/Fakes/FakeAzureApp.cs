@@ -20,7 +20,9 @@ public sealed class FakeAzureApp : IDisposable
         TestApp app,
         Func<string, LogsQueryResult>? logs = null,
         Func<string, string?>? arm = null,
-        bool enableDcrPage = true)
+        bool enableDcrPage = true,
+        TokenCredential? credential = null,
+        IReadOnlyDictionary<string, string>? settings = null)
     {
         Logs = new FakeLogsQueryClient(logs ?? (_ => LogsResults.Empty()));
         Arm = new FakeArmHandler(arm ?? EmptyCollections);
@@ -28,11 +30,15 @@ public sealed class FakeAzureApp : IDisposable
         _factory = app.WithWebHostBuilder(builder =>
         {
             builder.UseSetting("Sentinel:EnableDcrPage", enableDcrPage.ToString());
+            foreach (var (key, value) in settings ?? new Dictionary<string, string>())
+                builder.UseSetting(key, value);
             builder.ConfigureTestServices(services =>
             {
                 services.AddSingleton<LogsQueryClient>(Logs);
-                services.AddSingleton<TokenCredential>(new FakeTokenCredential());
+                services.AddSingleton<TokenCredential>(credential ?? new FakeTokenCredential());
                 services.AddHttpClient(nameof(ArmRestClient)).ConfigurePrimaryHttpMessageHandler(() => Arm);
+                // The real status provider (TestApp uses a stub); ARM is faked above.
+                services.AddSingleton<IWorkspaceStatusProvider, SentinelStatusProvider>();
             });
         });
     }

@@ -1,3 +1,4 @@
+using Azure;
 using Azure.Monitor.Query.Logs;
 using Azure.Monitor.Query.Logs.Models;
 using Microsoft.Extensions.Options;
@@ -68,7 +69,9 @@ public class LogAnalyticsService
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
+            // The caller keeps the rule list and reports the incident counts as not loaded.
             _logger.LogError(ex, "Failed to query incidents for workspace {Workspace}", workspace.WorkspaceName);
+            throw;
         }
 
         // Titles are only sent for rules that no longer exist, as a hint to which rule it was.
@@ -164,7 +167,10 @@ public class LogAnalyticsService
                 }
                 catch (Exception ex) when (ex is not OperationCanceledException)
                 {
+                    // The measured volumes are still correct; say that estimated tables may be missing.
                     _logger.LogWarning(ex, "Union ingestion query failed for missing tables, skipping");
+                    response.PartialError = new LoadError(LoadError.From(ex).Code,
+                        "Estimated volumes for tables without Usage data could not be read; those tables are missing. See the server log.");
                 }
             }
 
@@ -172,9 +178,10 @@ public class LogAnalyticsService
             response.TotalVolumeMB = response.Tables.Sum(t => t.VolumeMB);
             response.TotalEstimatedCostUSD = response.Tables.Sum(t => t.EstimatedCostUSD);
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is not OperationCanceledException)
         {
-            _logger.LogError(ex, "Failed to query ingestion stats");
+            _logger.LogError(ex, "Failed to query ingestion stats for workspace {Workspace}", workspace.WorkspaceName);
+            throw;
         }
 
         return response;
@@ -238,7 +245,9 @@ public class LogAnalyticsService
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
-            _logger.LogWarning(ex, "Last log query failed for workspace {Workspace}", workspace.WorkspaceName);
+            // Without last log times every connector would look silent: fail instead.
+            _logger.LogError(ex, "Last log query failed for workspace {Workspace}", workspace.WorkspaceName);
+            throw;
         }
 
         // Tables outside the fixed list, for example DCR destinations such as Perf or custom _CL
@@ -265,7 +274,8 @@ public class LogAnalyticsService
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
-            _logger.LogWarning(ex, "Usage freshness query failed for workspace {Workspace}", workspace.WorkspaceName);
+            _logger.LogError(ex, "Usage freshness query failed for workspace {Workspace}", workspace.WorkspaceName);
+            throw;
         }
 
         return result;
@@ -315,8 +325,12 @@ public class LogAnalyticsService
             }
             response.HealthMonitoringEnabled = true;
         }
-        catch
+        catch (RequestFailedException ex) when (ex.Status == 400)
         {
+            // The SentinelHealth table does not exist when health monitoring was never turned on.
+            // Any other failure (authentication, access, network) is an error, not "not enabled".
+            _logger.LogInformation("SentinelHealth is not available in workspace {Workspace}: {Message}",
+                workspace.WorkspaceName, ex.Message);
             response.HealthMonitoringEnabled = false;
             return response;
         }
@@ -405,7 +419,7 @@ public class LogAnalyticsService
                 }
             }
         }
-        catch (Exception ex) { _logger.LogWarning(ex, "SentinelHealth summary query failed"); }
+        catch (Exception ex) when (ex is not OperationCanceledException) { _logger.LogWarning(ex, "SentinelHealth summary query failed"); throw; }
         return result;
     }
 
@@ -446,7 +460,7 @@ public class LogAnalyticsService
                 }
             }
         }
-        catch (Exception ex) { _logger.LogWarning(ex, "SentinelHealth trend query failed"); }
+        catch (Exception ex) when (ex is not OperationCanceledException) { _logger.LogWarning(ex, "SentinelHealth trend query failed"); throw; }
         return points.Values.ToList();
     }
 
@@ -488,6 +502,7 @@ public class LogAnalyticsService
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
             _logger.LogWarning(ex, "SentinelHealth connector status query failed");
+            throw;
         }
         return result;
     }
@@ -520,7 +535,7 @@ public class LogAnalyticsService
                 }
             }
         }
-        catch (Exception ex) { _logger.LogWarning(ex, "SentinelHealth auto-disabled query failed"); }
+        catch (Exception ex) when (ex is not OperationCanceledException) { _logger.LogWarning(ex, "SentinelHealth auto-disabled query failed"); throw; }
         return result;
     }
 
@@ -561,7 +576,7 @@ public class LogAnalyticsService
                 }
             }
         }
-        catch (Exception ex) { _logger.LogWarning(ex, "SentinelHealth recent failures query failed"); }
+        catch (Exception ex) when (ex is not OperationCanceledException) { _logger.LogWarning(ex, "SentinelHealth recent failures query failed"); throw; }
         return result;
     }
 }

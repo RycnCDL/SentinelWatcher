@@ -53,4 +53,10 @@ public class AnalyticsRulesResponse
     public List<NoRuleIncidents> NoRuleSources { get; set; } = new();
 
     public DateTime LastRefreshed { get; set; }
+
+    /// <summary>Set when the incident counts could not be read. The rule list is still valid.</summary>
+    public LoadError? IncidentsError { get; set; }
+
+    /// <summary>Set when the latest refresh failed and this is older data.</summary>
+    public LoadError? RefreshError { get; set; }
 }

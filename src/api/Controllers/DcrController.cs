@@ -34,9 +34,6 @@ public class DcrController : WorkspaceControllerBase
         await _cacheManager.EnsureDataAvailableAsync(ws, HttpContext.RequestAborted);
 
         var entry = _cacheManager.GetOrCreateEntry(ws);
-        if (entry.Dcr == null)
-            return StatusCode(503, new { message = "Data is still loading. Please try again shortly." });
-
-        return Ok(entry.Dcr);
+        return Section(entry.Dcr, entry.DcrError);
     }
 }

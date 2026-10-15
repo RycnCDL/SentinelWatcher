@@ -22,6 +22,23 @@ public abstract class WorkspaceControllerBase : ControllerBase
     }
 
     /// <summary>
+    /// Answers with a cached section: its data (200, possibly older data marked with RefreshError),
+    /// the error of the latest refresh when there is no data (502), or "still loading" (503).
+    /// A failure is never answered with empty data, which the UI would show as zeros.
+    /// </summary>
+    protected ActionResult Section<T>(T? data, LoadError? error) where T : class
+    {
+        if (data is not null) return Ok(data);
+        if (error is not null) return SectionError(error);
+        return StatusCode(StatusCodes.Status503ServiceUnavailable,
+            new { message = "Data is still loading. Please try again shortly." });
+    }
+
+    /// <summary>502 with the error, in the shape the client reads: { "error": { "code", "message" } }.</summary>
+    protected ActionResult SectionError(LoadError error) =>
+        StatusCode(StatusCodes.Status502BadGateway, new { error });
+
+    /// <summary>
     /// Resolves the requested workspace. Returns null and sets <paramref name="error"/> to
     /// 400 (missing or malformed) or 403 (not on the allow-list).
     /// </summary>

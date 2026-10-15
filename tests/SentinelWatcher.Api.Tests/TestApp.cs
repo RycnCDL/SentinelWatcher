@@ -62,8 +62,8 @@ public sealed class TestApp : WebApplicationFactory<Program>
 
     private sealed class FakeStatusProvider : IWorkspaceStatusProvider
     {
-        public Task<bool> IsSentinelEnabledAsync(WorkspaceContext workspace, CancellationToken cancellationToken)
-            => Task.FromResult(true);
+        public Task<bool?> IsSentinelEnabledAsync(WorkspaceContext workspace, CancellationToken cancellationToken)
+            => Task.FromResult<bool?>(true);
     }
 }
 

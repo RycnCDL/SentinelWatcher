@@ -37,4 +37,7 @@ public class DcrResponse
     public int WarningCount { get; set; }
     public int ErrorCount { get; set; }
     public DateTime LastChecked { get; set; }
+
+    /// <summary>Set when the latest refresh failed and this is older data.</summary>
+    public LoadError? RefreshError { get; set; }
 }

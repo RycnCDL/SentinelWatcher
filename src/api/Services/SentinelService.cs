@@ -142,9 +142,11 @@ public class SentinelService
                 rules.Add((id, name, severity, enabled));
             }
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is not OperationCanceledException)
         {
+            // The caller records the failure; an empty list would look like "no rules".
             _logger.LogError(ex, "Failed to list analytics rules for workspace {Ws}", workspace.WorkspaceName);
+            throw;
         }
         return rules;
     }
@@ -246,9 +248,13 @@ public class SentinelService
                     connectorGroups[name] = connHealth;
                 }
             }
-            catch (Exception ex)
+            catch (Exception ex) when (ex is not OperationCanceledException)
             {
+                // Connectors detected from table data are still correct, but the list may be
+                // incomplete. Say so instead of presenting it as complete.
                 _logger.LogWarning(ex, "ARM API connector query failed, using table-based detection only");
+                response.PartialError = new LoadError(LoadError.From(ex).Code,
+                    "The connector list from Microsoft Sentinel could not be read; only connectors detected from table data are shown. See the server log.");
             }
 
             // Calculate health status
@@ -269,9 +275,10 @@ public class SentinelService
             response.ErrorCount = response.Connectors.Count(c => c.Status == "Error");
             response.QuietCount = response.Connectors.Count(c => c.Status == "Quiet");
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is not OperationCanceledException)
         {
             _logger.LogError(ex, "Failed to detect data connectors");
+            throw;
         }
 
         return response;

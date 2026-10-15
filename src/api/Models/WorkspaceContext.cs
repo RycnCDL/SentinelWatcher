@@ -25,5 +25,6 @@ public class WorkspaceInfo
     public string WorkspaceName { get; set; } = string.Empty;
     public string SubscriptionId { get; set; } = string.Empty;
     public string ResourceGroup { get; set; } = string.Empty;
-    public bool SentinelEnabled { get; set; }
+    /// <summary>Null when the status could not be read.</summary>
+    public bool? SentinelEnabled { get; set; }
 }

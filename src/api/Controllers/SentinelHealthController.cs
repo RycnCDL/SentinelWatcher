@@ -29,7 +29,14 @@ public class SentinelHealthController : WorkspaceControllerBase
         var ws = ResolveWorkspace(workspace, out var error);
         if (ws is null) return error!;
 
-        var result = await _cacheManager.GetSentinelHealthAsync(ws, days);
-        return Ok(result);
+        try
+        {
+            return Ok(await _cacheManager.GetSentinelHealthAsync(ws, days));
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            // Never "health monitoring not enabled" for a failure; the cache retries soon.
+            return SectionError(LoadError.From(ex));
+        }
     }
 }

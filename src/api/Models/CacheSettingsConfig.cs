@@ -16,5 +16,11 @@ public class CacheSettingsConfig
     /// </summary>
     public int EvictAfterMinutes { get; set; } = 30;
 
+    /// <summary>
+    /// When a section failed in the latest refresh, it is retried after this many seconds instead of
+    /// HeavyQueryRefreshMinutes.
+    /// </summary>
+    public int ErrorRetrySeconds { get; set; } = 30;
+
     public double CostPerGBDollars { get; set; } = 2.76;
 }
