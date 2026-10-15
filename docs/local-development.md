@@ -12,7 +12,7 @@ Locally, the API calls Azure as you instead of a managed identity. With `Sentine
 ## Requirements
 
 - .NET 10 SDK
-- Node.js 22
+- Node.js 22.20 or later (supported: `^22.20.0 || ^24.12.0 || >=26.0.0`, set as `engines` in `src/client/package.json`; `npm ci` stops with `EBADENGINE` on an older version)
 - Azure CLI
 - Bash for the app registration script (Git Bash on Windows, or Azure Cloud Shell)
 - An app registration with the Viewer role assigned to you: `bash scripts/setup-app-registration.sh --assign-me` (see [Installation](installation.md#step-2-create-the-app-registration)). It always adds `http://localhost:5173` as a redirect URI.

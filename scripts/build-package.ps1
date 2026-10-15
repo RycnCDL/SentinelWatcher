@@ -10,7 +10,7 @@
     4. Zips the result to artifacts/sentinelwatcher.zip with forward-slash entry names, as
        App Service on Linux expects for WEBSITE_RUN_FROM_PACKAGE and az webapp deploy.
 
-    Requires PowerShell 7, Node.js 22 and the .NET 10 SDK. Runs on Windows, Linux and macOS.
+    Requires PowerShell 7, Node.js 22 (22.20 or later) and the .NET 10 SDK. Runs on Windows, Linux and macOS.
 
 .PARAMETER Dotnet
     Path to the dotnet executable. Defaults to dotnet on PATH, then ~/.dotnet/dotnet.

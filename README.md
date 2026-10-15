@@ -125,7 +125,7 @@ More in [Troubleshooting](docs/troubleshooting.md) and the [FAQ](docs/faq.md).
 | Component | Tested with |
 |-----------|-------------|
 | .NET | .NET 10 (SDK 10.0.402); App Service runtime `DOTNETCORE\|10.0` on Linux |
-| Node.js (build only) | 22 (22.20.0) |
+| Node.js (build only) | 22.20.0; minimum 22.20, supported `^22.20.0 \|\| ^24.12.0 \|\| >=26.0.0` |
 | Microsoft Defender portal | Tested with a workspace onboarded to the Defender portal (October 2026) |
 | Azure portal | Uses the same ARM and Log Analytics APIs; a workspace managed only in the Azure portal was not tested separately for 0.1.0 |
 

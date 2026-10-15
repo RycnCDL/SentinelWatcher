@@ -26,6 +26,8 @@ jobs:
 
       - uses: actions/setup-node@v5
         with:
+          # Latest 22.x. Must satisfy "engines" in src/client/package.json (22.20 or later);
+          # src/client/.npmrc sets engine-strict, so npm ci fails on an older Node.
           node-version: 22
           cache: npm
           cache-dependency-path: src/client/package-lock.json

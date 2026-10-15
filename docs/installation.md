@@ -125,7 +125,7 @@ With the default `packageUrl` (latest release), the app picks up the newest rele
 
 ## Deploy your own build
 
-Build the package with `pwsh scripts/build-package.ps1` (PowerShell 7, .NET 10 SDK, Node.js 22), deploy the template with `packageUrl=` (empty), then:
+Build the package with `pwsh scripts/build-package.ps1` (PowerShell 7, .NET 10 SDK and Node.js 22, version 22.20 or later), deploy the template with `packageUrl=` (empty), then:
 
 ```bash
 az webapp deploy -g rg-sentinelwatcher -n <appName> --src-path artifacts/sentinelwatcher.zip --type zip

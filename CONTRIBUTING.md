@@ -10,7 +10,7 @@ Thanks for helping with SentinelWatcher. Bug reports, ideas and pull requests ar
 
 ## Development setup
 
-Follow [docs/local-development.md](docs/local-development.md). In short: .NET 10 SDK, Node.js 22, Azure CLI, an app registration created with `scripts/setup-app-registration.sh`, and `az login` with read access to a test workspace.
+Follow [docs/local-development.md](docs/local-development.md). In short: .NET 10 SDK, Node.js 22 (22.20 or later), Azure CLI, an app registration created with `scripts/setup-app-registration.sh`, and `az login` with read access to a test workspace.
 
 ## Checks before a pull request
 
