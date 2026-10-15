@@ -45,3 +45,7 @@ artifacts/
 .DS_Store
 Thumbs.db
 *.log
+
+# Editor and tool backups (may contain local settings)
+*.bak
+*.orig
