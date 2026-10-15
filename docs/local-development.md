@@ -7,7 +7,7 @@ last_validated: 2026-10-15
 
 # Local development
 
-Locally, the API calls Azure as you (`DefaultAzureCredential`, usually your `az login`) instead of a managed identity. Everything else works as in Azure.
+Locally, the API calls Azure as you instead of a managed identity. With `Sentinel:ManagedIdentityClientId` empty it tries, in this order: Azure CLI (`az login`), Visual Studio, Visual Studio Code and Azure PowerShell. It never tries a managed identity, which does not exist on a dev machine. Everything else works as in Azure.
 
 ## Requirements
 
@@ -30,7 +30,7 @@ az role assignment create --assignee-object-id "$me" --assignee-principal-type U
 
 ## Run it
 
-1. Sign in: `az login --tenant <tenant-id>`. If you are also signed in to Visual Studio with another account, `DefaultAzureCredential` may use that one first; sign out there.
+1. Sign in: `az login --tenant <tenant-id>`. The Azure CLI is tried first, so it wins over a Visual Studio or VS Code sign-in with another account.
 2. Copy `src/api/appsettings.Development.sample.json` to `src/api/appsettings.Development.json` (gitignored) and fill in tenant ID, client ID and the workspace resource ID. Leave `ManagedIdentityClientId` empty.
 3. Start the API on http://localhost:5000:
 
@@ -39,7 +39,9 @@ az role assignment create --assignee-object-id "$me" --assignee-principal-type U
    dotnet run
    ```
 
-   The log should say "Using DefaultAzureCredential". http://localhost:5000/config.json shows your client and tenant ID.
+   At startup the log says "Azure credential: Sentinel:ManagedIdentityClientId is not set, using developer sign-in in this order: AzureCliCredential, ...", and after the first Azure call "Azure credential: signed in with AzureCliCredential". http://localhost:5000/config.json shows your client and tenant ID.
+
+   If the pages say "Could not load data, see server log" with `AuthenticationFailed`, no sign-in worked: run `az login` again. The app retries failed sections after 30 seconds.
 4. In a second terminal, start the web app:
 
    ```bash
@@ -63,8 +65,11 @@ Client checks:
 ```bash
 cd src/client
 npm run lint
+npm test
 npm run build
 ```
+
+The client tests (Vitest, jsdom) check that pages show "Could not load data, see server log" instead of zeros or "all good" texts when the API reports an error.
 
 ## Build the release package
 

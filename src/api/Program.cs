@@ -36,7 +36,7 @@ builder.Services.AddAuthorizationBuilder()
     .SetFallbackPolicy(AppRoles.BuildViewerPolicy());
 
 // Azure access: one identity for the whole app (user-assigned managed identity in Azure,
-// DefaultAzureCredential such as az login for local development).
+// developer sign-in such as az login for local development).
 builder.Services.AddSingleton<TokenCredential>(sp => AzureCredentialFactory.Create(
     sp.GetRequiredService<IOptions<SentinelOptions>>().Value,
     sp.GetRequiredService<ILoggerFactory>().CreateLogger("SentinelWatcher.Azure")));

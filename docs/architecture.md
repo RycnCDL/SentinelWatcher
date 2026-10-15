@@ -81,6 +81,7 @@ SentinelWatcher only uses **Azure Resource Manager** and the **Log Analytics que
 - Data older than 10 minutes is served while a refresh runs in the background (`CacheSettings:HeavyQueryRefreshMinutes`).
 - On the very first request for a workspace, the API waits up to 90 seconds for data.
 - Sentinel Health is cached per trend window for the same time.
+- Each section (rules and incidents, ingestion, data freshness, DCRs, Sentinel Health) succeeds or fails on its own. A failed section is never stored as empty data: the API returns its error (HTTP 502 with a code and a generic message), or the older data marked as from a failed refresh. Failed sections are retried after 30 seconds (`CacheSettings:ErrorRetrySeconds`).
 - Workspaces nobody requested for 30 minutes are removed from memory (`CacheSettings:EvictAfterMinutes`).
 - The refresh button on the Analytics Rules page forces a refresh.
 

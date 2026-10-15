@@ -22,7 +22,9 @@ First public release.
 - Workspace allow-list (`Sentinel:Workspaces`): requests for any other workspace return 403.
 - Bicep template and `azuredeploy.json` (Deploy to Azure): Linux App Service, managed identity, optional Application Insights, and least-privilege role assignments (Microsoft Sentinel Reader, plus a custom role with only `Microsoft.Insights/dataCollectionRules/read` for the DCR page).
 - App registration script with the Viewer role, "Assignment required" and tenant-wide admin consent for the sign-in permissions.
-- CI and release workflows, tests that fake Log Analytics and ARM.
+- Load errors per section: when Azure can't be read, pages show "Could not load data, see server log" with an error code instead of zeros or "all good", and failed sections are retried after 30 seconds.
+- Local development signs in with the Azure CLI first (then Visual Studio, VS Code, Azure PowerShell), never with a managed identity.
+- CI and release workflows, API tests that fake Log Analytics and ARM, client tests for the error states.
 
 ### Security
 

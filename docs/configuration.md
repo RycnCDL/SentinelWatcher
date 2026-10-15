@@ -28,7 +28,7 @@ If tenant or client ID is missing, `/config.json` returns 503 and the web app sh
 | Setting | Required | Default | Description |
 |---------|----------|---------|-------------|
 | `Sentinel:Workspaces` | Yes | empty | Allow-list of Log Analytics workspace resource IDs: `/subscriptions/{id}/resourceGroups/{rg}/providers/Microsoft.OperationalInsights/workspaces/{name}`. The only workspaces the app reads. Invalid entries stop the app at startup. |
-| `Sentinel:ManagedIdentityClientId` | In Azure | empty | Client ID of the user-assigned managed identity. When empty, `DefaultAzureCredential` is used (for local development with `az login`). |
+| `Sentinel:ManagedIdentityClientId` | In Azure | empty | Client ID of the user-assigned managed identity. When empty, the API uses developer sign-in (Azure CLI first, then Visual Studio, VS Code and Azure PowerShell; never managed identity). |
 | `Sentinel:EnableDcrPage` | No | `true` | Shows the Collection Rules page. When `false`, the page is hidden, `/api/dcr` returns 404, and no data collection rule is read. |
 
 ### Connector health
@@ -60,6 +60,7 @@ Example in App Service: `ConnectorHealth__Connectors__Syslog__WarningAfterMinute
 |---------|---------|-------------|
 | `CacheSettings:HeavyQueryRefreshMinutes` | `10` | Age after which cached workspace data is refreshed in the background |
 | `CacheSettings:EvictAfterMinutes` | `30` | Cached data of a workspace nobody requested for this long is removed |
+| `CacheSettings:ErrorRetrySeconds` | `30` | A section that failed to load is retried after this many seconds instead of `HeavyQueryRefreshMinutes` |
 | `CacheSettings:CostPerGBDollars` | `2.76` | Price per GB used for the cost estimate on Log Ingestion. Set it to your effective analytics tier price. Commitment tiers, benefits and data lake pricing are not considered. |
 
 ### Other

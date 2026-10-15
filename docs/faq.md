@@ -64,4 +64,4 @@ It is an estimate: billable GB from the `Usage` table times one price per GB (`C
 
 ## Can I run it somewhere other than Azure App Service?
 
-v0.1 is built and tested for App Service with a user-assigned managed identity. The API uses `DefaultAzureCredential` when no managed identity is configured, but other hosting is not documented or tested.
+v0.1 is built and tested for App Service with a user-assigned managed identity. Without a managed identity client ID, the API uses developer sign-in (Azure CLI, Visual Studio, VS Code, Azure PowerShell), which is meant for local development. Other hosting is not documented or tested.

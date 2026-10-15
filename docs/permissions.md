@@ -82,4 +82,4 @@ The web app requests the SentinelWatcher API scope (`api://<client-id>/access_as
 
 ## Local development
 
-Locally, the API uses `DefaultAzureCredential`, usually your `az login`. Your account then needs what the managed identity needs: Microsoft Sentinel Reader on the workspace resource group, plus Monitoring Reader or the custom role if you want to see the Collection Rules page. Owner, Contributor or Reader on the resource group also work. See [Local development](local-development.md).
+Locally, the API uses developer sign-in, usually your `az login` (see [Local development](local-development.md)). Your account then needs what the managed identity needs: Microsoft Sentinel Reader on the workspace resource group, plus Monitoring Reader or the custom role if you want to see the Collection Rules page. Owner, Contributor or Reader on the resource group also work. See [Local development](local-development.md).

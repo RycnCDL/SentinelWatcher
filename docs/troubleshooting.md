@@ -15,6 +15,20 @@ az webapp log tail -g <app-rg> -n <appName>
 
 With Application Insights enabled, the same messages are in its `traces` table.
 
+## "Could not load data, see server log"
+
+A page or Dashboard card shows this when the API could not read Azure for that section. It never shows zeros or "all good" in that case. The code says why; the server log has the details (search for "Section ... failed").
+
+| Code | Meaning | Fix |
+|------|---------|-----|
+| `AuthenticationFailed` | No Azure token for the app's identity | In Azure: check `Sentinel__ManagedIdentityClientId` and that the identity is assigned to the web app. Locally: run `az login`. |
+| `AccessDenied` | Azure returned 401 or 403 | Check the identity's role assignments ([Permissions](permissions.md)); new assignments take a few minutes |
+| `NotFound` | An Azure resource was not found | Check the workspace resource ID in `Sentinel:Workspaces` |
+| `Timeout` | Azure did not answer in time | Usually temporary |
+| `AzureRequestFailed` | Any other Azure error | See the server log |
+
+Failed sections are retried after 30 seconds (`CacheSettings:ErrorRetrySeconds`), so the page recovers by itself once the cause is fixed. If a refresh fails while older data exists, the older data is shown with a "latest refresh failed" note.
+
 ## Sign-in
 
 | Symptom | Cause | Fix |

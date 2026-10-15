@@ -88,10 +88,11 @@ The template sets everything required. The most important settings:
 |---------|---------|-------------|
 | `AzureAd:TenantId`, `AzureAd:ClientId` | | App registration used for sign-in |
 | `Sentinel:Workspaces` | | Allow-list of workspace resource IDs. Other workspaces get 403. |
-| `Sentinel:ManagedIdentityClientId` | | Managed identity for Azure calls. Empty: `DefaultAzureCredential` (local development). |
+| `Sentinel:ManagedIdentityClientId` | | Managed identity for Azure calls. Empty: developer sign-in such as `az login` (local development). |
 | `Sentinel:EnableDcrPage` | `true` | Collection Rules page. `false` hides it and needs no DCR access. |
 | `ConnectorHealth:WarningAfterMinutes`, `ErrorAfterMinutes` | `60`, `120` | Data freshness thresholds, with overrides per connector type |
 | `CacheSettings:HeavyQueryRefreshMinutes` | `10` | Cache refresh interval |
+| `CacheSettings:ErrorRetrySeconds` | `30` | Retry interval for sections that failed to load |
 | `CacheSettings:CostPerGBDollars` | `2.76` | Price per GB for the cost estimate |
 
 In App Service, use `__` instead of `:` (for example `Sentinel__EnableDcrPage`). All settings and template parameters: [Configuration](docs/configuration.md).
@@ -115,6 +116,7 @@ Log Analytics Reader is not needed. Microsoft Sentinel Reader can read every wor
 | Empty pages or "Data is still loading" | Wait for the role assignments, restart the app, check `az webapp log tail` for `AuthorizationFailed` |
 | 403 "This workspace is not configured" | Add the workspace to `Sentinel:Workspaces` |
 | A DCR shows Error | The log names the destination table without data in the last 24 hours |
+| "Could not load data, see server log" | The API could not read Azure. The code says why (for example `AuthenticationFailed`, `AccessDenied`); the server log has the details |
 
 More in [Troubleshooting](docs/troubleshooting.md) and the [FAQ](docs/faq.md).
 

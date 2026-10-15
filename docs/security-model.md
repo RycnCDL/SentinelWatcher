@@ -86,6 +86,8 @@ The identity is not used for anything else. Protect the app resource group like 
 | `/api/dcr` | DCR resource ID, name, location, data source names, destination table names, "this workspace" or "other workspace", tier, receiving status and last log time |
 | `/api/sentinelhealth` | health score and counts; names and resource IDs of auto-disabled rules; connector name, kind, status, last event, stale flag and a fixed failure category; recent failures with time, resource type, name, kind, status and category |
 
+When a section can't be loaded, the API returns an error code and a fixed message instead (for example `AuthenticationFailed`, "Could not get an Azure token for the app's identity. See the server log."). Exception details stay in the server log.
+
 No endpoint returns log records, incident details, entities, user names, host names or IP addresses. Two kinds of names are chosen by your administrators and can contain anything they put there: **analytics rule names** and **DCR data source names**. The **title of one incident per deleted rule** can contain entity values if the rule put them into its alert titles.
 
 Raw text that often contains identifiers stays on the server:

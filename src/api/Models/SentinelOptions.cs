@@ -16,7 +16,7 @@ public class SentinelOptions
 
     /// <summary>
     /// Client ID of the user-assigned managed identity used for all Azure calls.
-    /// When empty, DefaultAzureCredential is used (for local development with az login).
+    /// When empty, developer sign-in is used (Azure CLI first; see AzureCredentialFactory).
     /// </summary>
     public string? ManagedIdentityClientId { get; set; }
 

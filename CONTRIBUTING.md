@@ -18,7 +18,7 @@ Run these from the repository root. CI runs the same checks.
 
 ```bash
 dotnet test SentinelWatcher.sln -c Release
-cd src/client && npm ci && npm run lint && npm run build
+cd src/client && npm ci && npm run lint && npm test && npm run build
 ```
 
 If you changed `infra/main.bicep` or `infra/modules/*.bicep`, regenerate the ARM template and commit it:
