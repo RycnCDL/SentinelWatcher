@@ -339,12 +339,13 @@ public class LogAnalyticsService
 
         // Populate response from results
         var summary = summaryTask.Result;
-        response.TotalConnectors    = summary.GetValueOrDefault("DataConnector_Total");
-        response.HealthyConnectors  = summary.GetValueOrDefault("DataConnector_Success");
-        response.TotalRuleRuns      = summary.GetValueOrDefault("AnalyticsRule_Total");
-        response.FailedRuleRuns     = summary.GetValueOrDefault("AnalyticsRule_Failure");
-        response.TotalAutomationRuns  = summary.GetValueOrDefault("AutomationRule_Total") + summary.GetValueOrDefault("Playbook_Total");
-        response.FailedAutomationRuns = summary.GetValueOrDefault("AutomationRule_Failure") + summary.GetValueOrDefault("Playbook_Failure");
+        var rules       = summary.GetValueOrDefault(SentinelHealthScore.AnalyticsRule);
+        var automation  = summary.GetValueOrDefault(SentinelHealthScore.AutomationRule);
+        var playbooks   = summary.GetValueOrDefault(SentinelHealthScore.Playbook);
+        response.TotalRuleRuns        = rules.Total;
+        response.FailedRuleRuns       = rules.Failure;
+        response.TotalAutomationRuns  = automation.Total + playbooks.Total;
+        response.FailedAutomationRuns = automation.Failure + playbooks.Failure;
 
         response.Trend               = trendTask.Result;
         response.ConnectorStatuses   = connectorsTask.Result;
@@ -352,23 +353,21 @@ public class LogAnalyticsService
         response.AutoDisabledRulesCount = response.AutoDisabledRules.Count;
         response.RecentFailures      = recentFailTask.Result;
 
-        // Health Score: % of resource runs that succeeded in last 24h
-        var totalRuns   = summary.Values.Where((v, i) => i % 2 == 0).Sum(); // all *_Total
-        var failedRuns  = response.FailedRuleRuns + response.FailedAutomationRuns +
-                          (response.TotalConnectors - response.HealthyConnectors);
-        response.HealthScore = totalRuns > 0
-            ? (int)Math.Round(100.0 * (totalRuns - failedRuns) / totalRuns)
-            : 100;
-        response.HealthScore = Math.Clamp(response.HealthScore, 0, 100);
+        // Connector KPI: latest reported status per connector, not the number of health events.
+        response.TotalConnectors   = response.ConnectorStatuses.Count;
+        response.HealthyConnectors = response.ConnectorStatuses.Count(c => c.Status == "Success");
+
+        // Health Score: % of health events in the last 24h that succeeded, over all resource types.
+        response.HealthScore = SentinelHealthScore.Compute(summary.Values);
 
         return response;
     }
 
     // ── Helper queries ────────────────────────────────────────────────────────
 
-    private async Task<Dictionary<string, int>> QuerySummaryAsync(LogsQueryClient client, WorkspaceContext ws)
+    private async Task<Dictionary<string, HealthRunCounts>> QuerySummaryAsync(LogsQueryClient client, WorkspaceContext ws)
     {
-        var result = new Dictionary<string, int>();
+        var result = SentinelHealthScore.CreateSummary();
         try
         {
             var kql = @"
@@ -385,10 +384,11 @@ public class LogAnalyticsService
             {
                 foreach (var row in qr.Value.Table.Rows)
                 {
-                    var type = (row.GetString("SentinelResourceType") ?? "").Replace(" ", "");
-                    result[$"{type}_Total"]   = (int)(row.GetInt64("Total") ?? 0);
-                    result[$"{type}_Success"] = (int)(row.GetInt64("Success") ?? 0);
-                    result[$"{type}_Failure"] = (int)(row.GetInt64("Failure") ?? 0);
+                    var type = SentinelHealthScore.NormalizeResourceType(row.GetString("SentinelResourceType"));
+                    result[type] = new HealthRunCounts(
+                        Total:   (int)(row.GetInt64("Total") ?? 0),
+                        Success: (int)(row.GetInt64("Success") ?? 0),
+                        Failure: (int)(row.GetInt64("Failure") ?? 0));
                 }
             }
         }

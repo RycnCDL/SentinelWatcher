@@ -44,9 +44,11 @@ public class SentinelHealthResponse
     // Health Score (0 to 100)
     public int HealthScore { get; set; }
 
-    // KPIs: last 24h
+    // Connectors with a reported status, and how many of them last reported Success
     public int TotalConnectors { get; set; }
     public int HealthyConnectors { get; set; }
+
+    // Run KPIs: last 24h
     public int TotalRuleRuns { get; set; }
     public int FailedRuleRuns { get; set; }
     public int AutoDisabledRulesCount { get; set; }
