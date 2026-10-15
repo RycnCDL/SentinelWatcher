@@ -490,6 +490,13 @@ nav {
   box-shadow: 0 0 8px rgba(107, 114, 128, 0.2);
 }
 
+.badge--inline {
+  margin-left: 0.5rem;
+  padding: 0.1rem 0.5rem;
+  font-size: 0.66rem;
+  vertical-align: middle;
+}
+
 /* Dark-specific badge text brightening */
 [data-theme="dark"] .badge--high { color: #ff8080; }
 [data-theme="dark"] .badge--medium { color: #fcd34d; }

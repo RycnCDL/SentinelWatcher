@@ -7,6 +7,12 @@ public class TableIngestion
     public double VolumeGB => Math.Round(VolumeMB / 1024, 2);
     public double EstimatedCostUSD { get; set; }
     public double DailyAverageMB { get; set; }
+
+    /// <summary>
+    /// True when the table has no Usage data and the volume is estimated from its record
+    /// count (1 KB per record) instead of measured.
+    /// </summary>
+    public bool IsEstimated { get; set; }
 }
 
 public class IngestionResponse

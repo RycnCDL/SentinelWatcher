@@ -21,6 +21,8 @@ export interface TableIngestion {
   volumeGB: number;
   estimatedCostUSD: number;
   dailyAverageMB: number;
+  // No Usage data for this table: volume is estimated from the record count (1 KB per record).
+  isEstimated: boolean;
 }
 
 export interface IngestionResponse {

@@ -179,7 +179,8 @@ public class LogAnalyticsService
                                 TableName        = tableName,
                                 VolumeMB         = estimatedMB,
                                 EstimatedCostUSD = Math.Round(cost, 2),
-                                DailyAverageMB   = Math.Round(estimatedMB / 30, 2)
+                                DailyAverageMB   = Math.Round(estimatedMB / 30, 2),
+                                IsEstimated      = true
                             });
                         }
                     }

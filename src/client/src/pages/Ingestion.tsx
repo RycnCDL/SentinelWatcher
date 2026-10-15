@@ -99,6 +99,13 @@ export default function Ingestion() {
     costUSD: t.estimatedCostUSD,
   }));
 
+  // Tables without Usage data have an estimated volume (record count x 1 KB), not a measured one.
+  const estimatedTables = new Set(filteredTables.filter((t) => t.isEstimated).map((t) => t.tableName));
+  const formatGB = (value: unknown, _name: unknown, item: { payload?: { name?: string } }) => {
+    const gb = typeof value === 'number' ? `${value.toFixed(2)} GB` : '0 GB';
+    return estimatedTables.has(item.payload?.name ?? '') ? `${gb} (estimated)` : gb;
+  };
+
   const filteredTotal = filteredTables.reduce((s, t) => s + t.volumeGB, 0);
   const filteredCost = filteredTables.reduce((s, t) => s + t.estimatedCostUSD, 0);
 
@@ -170,10 +177,7 @@ export default function Ingestion() {
                       width={140}
                       tick={{ fill: axisTickFill, fontSize: 11 }}
                     />
-                    <Tooltip
-                      contentStyle={tooltipStyle}
-                      formatter={(value) => (typeof value === 'number' ? `${value.toFixed(2)} GB` : '0 GB')}
-                    />
+                    <Tooltip contentStyle={tooltipStyle} formatter={formatGB} />
                     <Bar dataKey="volumeGB" fill="#3B82F6" radius={[0, 4, 4, 0]} style={{ filter: 'drop-shadow(0 4px 8px rgba(59, 130, 246, 0.3))' }} />
                   </BarChart>
                 </ResponsiveContainer>
@@ -205,10 +209,7 @@ export default function Ingestion() {
                         />
                       ))}
                     </Pie>
-                    <Tooltip
-                      contentStyle={tooltipStyle}
-                      formatter={(value) => (typeof value === 'number' ? `${value.toFixed(2)} GB` : '0 GB')}
-                    />
+                    <Tooltip contentStyle={tooltipStyle} formatter={formatGB} />
                   </PieChart>
                 </ResponsiveContainer>
                 <CustomLegend data={pieData} colors={COLORS} />
@@ -235,7 +236,17 @@ export default function Ingestion() {
               <tbody>
                 {filteredTables.map((t) => (
                   <tr key={t.tableName}>
-                    <td>{t.tableName}</td>
+                    <td>
+                      {t.tableName}
+                      {t.isEstimated && (
+                        <span
+                          className="badge badge--informational badge--inline"
+                          title="No Usage data for this table. Volume is estimated from the record count at 1 KB per record."
+                        >
+                          estimated
+                        </span>
+                      )}
+                    </td>
                     <td className="text-right">{t.volumeMB.toLocaleString()}</td>
                     <td className="text-right">{t.volumeGB.toFixed(2)}</td>
                     <td className="text-right">{t.dailyAverageMB.toLocaleString()}</td>
@@ -259,6 +270,12 @@ export default function Ingestion() {
                 </tr>
               </tfoot>
             </table>
+            {estimatedTables.size > 0 && (
+              <p className="meta-text" style={{ marginTop: '0.75rem' }}>
+                Tables marked <em>estimated</em> have no Usage data. Their volume and cost are estimated
+                from the record count at 1 KB per record and can differ from the billed volume.
+              </p>
+            )}
           </div>
         </>
       )}
