@@ -185,6 +185,11 @@ export interface HealthFailureEvent {
   category: string;
 }
 
+export interface HealthFailureCount {
+  resourceType: string;
+  count: number;
+}
+
 export interface SentinelHealthResponse {
   queryTime: string;
   healthMonitoringEnabled: boolean;
@@ -203,5 +208,9 @@ export interface SentinelHealthResponse {
   autoDisabledRules: AutoDisabledRule[];
   trend: HealthTrendPoint[];
   connectorStatuses: ConnectorCurrentStatus[];
+  // Failures in the last 24h per resource type, counted over all health events.
+  failuresByType: HealthFailureCount[];
+  totalFailures: number;
+  // Newest failures in the last 24h, at most 50. Never count them: use the fields above.
   recentFailures: HealthFailureEvent[];
 }

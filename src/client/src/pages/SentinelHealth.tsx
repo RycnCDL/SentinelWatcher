@@ -229,13 +229,8 @@ export default function SentinelHealth() {
   }
 
   // ─── Derived data ──────────────────────────────────────────────────────────
-  const failuresByType = (() => {
-    const counts: Record<string, number> = {};
-    data.recentFailures.forEach(f => {
-      counts[f.resourceType] = (counts[f.resourceType] ?? 0) + 1;
-    });
-    return Object.entries(counts).map(([name, value]) => ({ name, value }));
-  })();
+  // Counted by the API over all failures; recentFailures only holds the newest 50.
+  const failuresByType = data.failuresByType.map(f => ({ name: f.resourceType, value: f.count }));
 
   const connectorIssues = data.connectorStatuses.filter(c => !isHealthy(c));
   const filteredConnectors = connectorFilter === 'issues' ? connectorIssues : data.connectorStatuses;
@@ -463,6 +458,11 @@ export default function SentinelHealth() {
       {/* ── Recent Failures ── */}
       <div className="section">
         <h3>Recent Failures (24h)</h3>
+        {data.totalFailures > data.recentFailures.length && (
+          <p className="meta-text">
+            Showing the {data.recentFailures.length} newest of {data.totalFailures} failures.
+          </p>
+        )}
         {data.recentFailures.length === 0 ? (
           <div style={{ textAlign: 'center', padding: '2rem', color: 'var(--healthy)' }}>
             ✓ No failures in the last 24 hours
