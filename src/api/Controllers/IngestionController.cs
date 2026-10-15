@@ -21,7 +21,7 @@ public class IngestionController : WorkspaceControllerBase
         var ws = ResolveWorkspace(workspace, out var error);
         if (ws is null) return error!;
 
-        await _cacheManager.EnsureDataAvailableAsync(ws);
+        await _cacheManager.EnsureDataAvailableAsync(ws, HttpContext.RequestAborted);
 
         var entry = _cacheManager.GetOrCreateEntry(ws);
         if (entry.Ingestion == null)

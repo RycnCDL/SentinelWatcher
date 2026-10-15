@@ -42,7 +42,7 @@ public class CacheEvictionTests : IClassFixture<TestApp>
 
         var entry = cache.GetOrCreateEntry(refreshing);
         entry.LastAccessed = now.AddHours(-2);
-        entry.IsRefreshing = true;
+        entry.RefreshTask = new TaskCompletionSource().Task; // a refresh that is still running
 
         var evicted = cache.EvictStaleEntries(now);
 

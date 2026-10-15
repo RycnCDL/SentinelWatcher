@@ -21,7 +21,7 @@ public class AnalyticsRulesController : WorkspaceControllerBase
         var ws = ResolveWorkspace(workspace, out var error);
         if (ws is null) return error!;
 
-        await _cacheManager.EnsureDataAvailableAsync(ws);
+        await _cacheManager.EnsureDataAvailableAsync(ws, HttpContext.RequestAborted);
 
         var entry = _cacheManager.GetOrCreateEntry(ws);
         if (entry.AnalyticsRules == null)
@@ -36,7 +36,7 @@ public class AnalyticsRulesController : WorkspaceControllerBase
         var ws = ResolveWorkspace(workspace, out var error);
         if (ws is null) return error!;
 
-        await _cacheManager.RefreshCacheAsync(ws);
+        await _cacheManager.RefreshAsync(ws);
         return Ok(new { message = "Cache refreshed" });
     }
 }

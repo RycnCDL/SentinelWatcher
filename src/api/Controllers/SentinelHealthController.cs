@@ -11,12 +11,12 @@ public class SentinelHealthController : WorkspaceControllerBase
     public const int MinDays = 1;
     public const int MaxDays = 30;
 
-    private readonly LogAnalyticsService _logAnalyticsService;
+    private readonly WorkspaceCacheManager _cacheManager;
 
-    public SentinelHealthController(WorkspaceRegistry registry, LogAnalyticsService logAnalyticsService)
+    public SentinelHealthController(WorkspaceRegistry registry, WorkspaceCacheManager cacheManager)
         : base(registry)
     {
-        _logAnalyticsService = logAnalyticsService;
+        _cacheManager = cacheManager;
     }
 
     /// <param name="workspace">Workspace resource ID from the allow-list.</param>
@@ -29,7 +29,7 @@ public class SentinelHealthController : WorkspaceControllerBase
         var ws = ResolveWorkspace(workspace, out var error);
         if (ws is null) return error!;
 
-        var result = await _logAnalyticsService.GetSentinelHealthAsync(ws, days);
+        var result = await _cacheManager.GetSentinelHealthAsync(ws, days);
         return Ok(result);
     }
 }
