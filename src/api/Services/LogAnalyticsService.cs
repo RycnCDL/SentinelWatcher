@@ -159,33 +159,33 @@ public class LogAnalyticsService
                         | where RecordCount > 0
                     ";
 
-                    var missingResult = await logsClient.QueryResourceAsync(workspace.ResourceIdentifier, missingKql, LogsQueryTimeRange.All);
+                    var missingResult = (await logsClient.QueryResourceAsync(
+                        workspace.ResourceIdentifier, missingKql, LogsQueryTimeRange.All, PartialErrorsAllowed)).Value;
 
-                    var missingStatus = missingResult.Value.Status;
-                    if (missingStatus == LogsQueryResultStatus.Success || missingStatus == LogsQueryResultStatus.PartialFailure)
+                    if (missingResult.Error is not null)
+                        LogPartialErrorOnce(workspace, "ingestion estimate", missingResult.Error);
+
+                    foreach (var row in missingResult.Table.Rows)
                     {
-                        foreach (var row in missingResult.Value.Table.Rows)
+                        var tableName   = row.GetString("Type") ?? "";
+                        var recordCount = row.GetInt64("RecordCount") ?? 0;
+                        if (string.IsNullOrEmpty(tableName) || recordCount == 0) continue;
+
+                        var estimatedMB = Math.Round(recordCount * 1.0 / 1024, 2);
+                        var estimatedGB = estimatedMB / 1024;
+                        var cost        = estimatedGB * _cacheConfig.CostPerGBDollars;
+
+                        response.Tables.Add(new TableIngestion
                         {
-                            var tableName   = row.GetString("Type") ?? "";
-                            var recordCount = row.GetInt64("RecordCount") ?? 0;
-                            if (string.IsNullOrEmpty(tableName) || recordCount == 0) continue;
-
-                            var estimatedMB = Math.Round(recordCount * 1.0 / 1024, 2);
-                            var estimatedGB = estimatedMB / 1024;
-                            var cost        = estimatedGB * _cacheConfig.CostPerGBDollars;
-
-                            response.Tables.Add(new TableIngestion
-                            {
-                                TableName        = tableName,
-                                VolumeMB         = estimatedMB,
-                                EstimatedCostUSD = Math.Round(cost, 2),
-                                DailyAverageMB   = Math.Round(estimatedMB / 30, 2),
-                                IsEstimated      = true
-                            });
-                        }
+                            TableName        = tableName,
+                            VolumeMB         = estimatedMB,
+                            EstimatedCostUSD = Math.Round(cost, 2),
+                            DailyAverageMB   = Math.Round(estimatedMB / 30, 2),
+                            IsEstimated      = true
+                        });
                     }
                 }
-                catch (Exception ex)
+                catch (Exception ex) when (ex is not OperationCanceledException)
                 {
                     _logger.LogWarning(ex, "Union ingestion query failed for missing tables, skipping");
                 }
@@ -227,16 +227,13 @@ public class LogAnalyticsService
 
     public async Task<Dictionary<string, DateTime?>> GetLastLogPerTableAsync(WorkspaceContext workspace)
     {
-        var logsClient = _logsClient;
-        var result = new Dictionary<string, DateTime?>();
-
-        _logger.LogInformation("Querying last log times for {Count} tables via single union query...", ImportantTables.Length);
+        var result = new Dictionary<string, DateTime?>(StringComparer.OrdinalIgnoreCase);
 
         try
         {
-            // Single union query with isfuzzy=true: silently skips tables that don't exist.
-            // The built-in Type column contains the source table name in Log Analytics.
-            // This replaces 36 individual queries with 1, which is significantly faster.
+            // One union over the fixed table list. isfuzzy=true skips tables that don't exist in
+            // the workspace; the service then reports a partial error, which is expected here.
+            // The built-in Type column contains the source table name.
             var tableList = string.Join(", ", ImportantTables);
             var kql = $@"
                 union isfuzzy=true {tableList}
@@ -245,69 +242,56 @@ public class LogAnalyticsService
                 | where isnotnull(LastLog)
             ";
 
-            var queryResult = await logsClient.QueryResourceAsync(workspace.ResourceIdentifier, kql, LogsQueryTimeRange.All);
+            var queryResult = (await _logsClient.QueryResourceAsync(
+                workspace.ResourceIdentifier, kql, LogsQueryTimeRange.All, PartialErrorsAllowed)).Value;
 
-            // Accept both Success and PartialFailure: isfuzzy=true raises PartialFailure
-            // when some tables don't exist in the workspace, but still returns valid rows.
-            var status = queryResult.Value.Status;
-            if (status == LogsQueryResultStatus.Success || status == LogsQueryResultStatus.PartialFailure)
+            foreach (var row in queryResult.Table.Rows)
             {
-                foreach (var row in queryResult.Value.Table.Rows)
-                {
-                    var tableName = row.GetString("Type") ?? "";
-                    var lastLog   = row.GetDateTimeOffset("LastLog")?.UtcDateTime;
-                    if (!string.IsNullOrEmpty(tableName) && lastLog.HasValue)
-                        result[tableName] = lastLog;
-                }
+                var tableName = row.GetString("Type") ?? "";
+                var lastLog   = row.GetDateTimeOffset("LastLog")?.UtcDateTime;
+                if (!string.IsNullOrEmpty(tableName) && lastLog.HasValue)
+                    result[tableName] = lastLog;
             }
 
-            _logger.LogInformation("Found {Count} tables with recent data (status: {Status})",
-                result.Count, status);
+            if (queryResult.Error is not null)
+                LogPartialErrorOnce(workspace, "last log", queryResult.Error);
 
-            // If union returned nothing at all, fall back to individual queries
-            if (result.Count == 0)
-            {
-                _logger.LogWarning("Union returned 0 results, falling back to parallel individual queries");
-                result = await GetLastLogPerTableParallelAsync(workspace, logsClient);
-            }
+            _logger.LogInformation("Found {Count} tables with data in the last 24 hours for workspace {Workspace}",
+                result.Count, workspace.WorkspaceName);
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is not OperationCanceledException)
         {
-            _logger.LogWarning(ex, "Union query threw exception, falling back to parallel individual queries");
-            result = await GetLastLogPerTableParallelAsync(workspace, logsClient);
+            _logger.LogWarning(ex, "Last log query failed for workspace {Workspace}", workspace.WorkspaceName);
         }
 
         return result;
     }
 
-    private async Task<Dictionary<string, DateTime?>> GetLastLogPerTableParallelAsync(
-        WorkspaceContext workspace, LogsQueryClient logsClient)
+    // Partial errors from "union isfuzzy=true" (tables that don't exist) are expected. Without this
+    // option the SDK throws instead of returning the rows that were found.
+    private static readonly LogsQueryOptions PartialErrorsAllowed = new() { AllowPartialErrors = true };
+
+    private static readonly System.Text.RegularExpressions.Regex MissingTablePattern =
+        new(@"named '([A-Za-z0-9_]+)'", System.Text.RegularExpressions.RegexOptions.Compiled);
+
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<string, byte> _loggedPartialErrors = new();
+
+    /// <summary>
+    /// Logs a partial query error once per workspace, query and message, at Information level,
+    /// because missing tables are normal (not every workspace has every connector).
+    /// </summary>
+    private void LogPartialErrorOnce(WorkspaceContext workspace, string queryName, object? error)
     {
-        var result    = new Dictionary<string, DateTime?>();
-        var semaphore = new SemaphoreSlim(10);
+        var text = error?.ToString() ?? "unknown partial error";
+        if (!_loggedPartialErrors.TryAdd($"{workspace.Key}|{queryName}|{text}", 0)) return;
 
-        var tasks = ImportantTables.Select(async table =>
-        {
-            await semaphore.WaitAsync();
-            try
-            {
-                var kql = $"{table} | where TimeGenerated > ago(24h) | summarize LastLog = max(TimeGenerated)";
-                var qr  = await logsClient.QueryResourceAsync(workspace.ResourceIdentifier, kql, LogsQueryTimeRange.All);
-
-                if (qr.Value.Status == LogsQueryResultStatus.Success && qr.Value.Table.Rows.Count > 0)
-                {
-                    var lastLog = qr.Value.Table.Rows[0].GetDateTimeOffset("LastLog")?.UtcDateTime;
-                    if (lastLog.HasValue)
-                        lock (result) { result[table] = lastLog; }
-                }
-            }
-            catch { /* Table doesn't exist */ }
-            finally { semaphore.Release(); }
-        });
-
-        await Task.WhenAll(tasks);
-        _logger.LogInformation("Parallel fallback found {Count} tables", result.Count);
-        return result;
+        var missing = MissingTablePattern.Matches(text).Select(m => m.Groups[1].Value).Distinct().ToList();
+        if (missing.Count > 0)
+            _logger.LogInformation("Tables not present in workspace {Workspace}, skipped by the {Query} query: {Tables}",
+                workspace.WorkspaceName, queryName, string.Join(", ", missing));
+        else
+            _logger.LogInformation("The {Query} query returned a partial result for workspace {Workspace}: {Error}",
+                queryName, workspace.WorkspaceName, text);
     }
 
     public async Task<SentinelHealthResponse> GetSentinelHealthAsync(WorkspaceContext workspace, int days = 7)
