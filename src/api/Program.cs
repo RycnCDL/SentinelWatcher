@@ -1,4 +1,5 @@
 using Azure.Core;
+using Azure.Monitor.OpenTelemetry.AspNetCore;
 using Azure.Monitor.Query.Logs;
 using Microsoft.Extensions.Options;
 using Microsoft.Identity.Web;
@@ -53,6 +54,13 @@ builder.Services.AddSingleton<WorkspaceService>();
 // Per-workspace cache, shared by all viewers (everyone sees data read by the same identity).
 builder.Services.AddSingleton<WorkspaceCacheManager>();
 builder.Services.AddHostedService<CacheEvictionService>();
+
+// Telemetry: requests, dependencies and logs go to Application Insights only when a
+// connection string is configured (APPLICATIONINSIGHTS_CONNECTION_STRING, set by infra/main.bicep).
+if (!string.IsNullOrWhiteSpace(builder.Configuration["APPLICATIONINSIGHTS_CONNECTION_STRING"]))
+{
+    builder.Services.AddOpenTelemetry().UseAzureMonitor();
+}
 
 builder.Services.AddControllers();
 builder.Services.AddOpenApi();
