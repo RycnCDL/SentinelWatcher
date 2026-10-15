@@ -70,8 +70,10 @@ builder.Services.AddOpenApi();
 
 var app = builder.Build();
 
-// Validate the workspace allow-list at startup so configuration errors fail fast.
+// Validate the workspace allow-list at startup so configuration errors fail fast, and create the
+// Azure credential now so the log says at startup which one is used.
 app.Services.GetRequiredService<WorkspaceRegistry>();
+app.Services.GetRequiredService<TokenCredential>();
 
 if (app.Environment.IsDevelopment())
 {

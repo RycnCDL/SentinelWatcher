@@ -15,16 +15,81 @@ public static class AzureCredentialFactory
     {
         if (!string.IsNullOrWhiteSpace(options.ManagedIdentityClientId))
         {
-            logger.LogInformation("Using user-assigned managed identity {ClientId} for Azure calls",
+            logger.LogInformation("Azure credential: user-assigned managed identity {ClientId}",
                 options.ManagedIdentityClientId);
             return new ManagedIdentityCredential(
                 ManagedIdentityId.FromUserAssignedClientId(options.ManagedIdentityClientId));
         }
 
-        // Local development: Azure CLI (az login), Visual Studio, environment variables and so on.
+        // Local development. No managed identity or workload identity: on a dev machine the
+        // managed identity endpoint does not exist, and DefaultAzureCredential can fail there
+        // instead of moving on to the Azure CLI.
+        var chain = new DeveloperCredentialChain(DeveloperSources(), logger);
         logger.LogInformation(
-            "Sentinel:ManagedIdentityClientId is not set. Using DefaultAzureCredential (for example az login) for Azure calls");
-        return new DefaultAzureCredential();
+            "Azure credential: Sentinel:ManagedIdentityClientId is not set, using developer sign-in in this order: {Sources}",
+            string.Join(", ", chain.SourceNames));
+        return chain;
+    }
+
+    /// <summary>
+    /// Developer credentials in the order they are tried: Azure CLI (az login) first, then
+    /// Visual Studio, Visual Studio Code and Azure PowerShell.
+    /// </summary>
+    public static IReadOnlyList<TokenCredential> DeveloperSources() => new TokenCredential[]
+    {
+        new AzureCliCredential(),
+        new VisualStudioCredential(),
+        new VisualStudioCodeCredential(),
+        new AzurePowerShellCredential(),
+    };
+}
+
+/// <summary>
+/// Tries each credential in order, like ChainedTokenCredential: a source that is not available
+/// (for example not signed in) is skipped, any other error stops the chain. Logs once which source
+/// delivered the first token.
+/// </summary>
+public sealed class DeveloperCredentialChain : TokenCredential
+{
+    private readonly IReadOnlyList<TokenCredential> _sources;
+    private readonly ILogger _logger;
+    private int _loggedSource;
+
+    public DeveloperCredentialChain(IReadOnlyList<TokenCredential> sources, ILogger logger)
+    {
+        _sources = sources;
+        _logger = logger;
+    }
+
+    public IReadOnlyList<TokenCredential> Sources => _sources;
+
+    public IEnumerable<string> SourceNames => _sources.Select(s => s.GetType().Name);
+
+    public override AccessToken GetToken(TokenRequestContext requestContext, CancellationToken cancellationToken) =>
+        GetTokenAsync(requestContext, cancellationToken).AsTask().GetAwaiter().GetResult();
+
+    public override async ValueTask<AccessToken> GetTokenAsync(TokenRequestContext requestContext, CancellationToken cancellationToken)
+    {
+        var unavailable = new List<CredentialUnavailableException>();
+        foreach (var source in _sources)
+        {
+            try
+            {
+                var token = await source.GetTokenAsync(requestContext, cancellationToken);
+                if (Interlocked.Exchange(ref _loggedSource, 1) == 0)
+                    _logger.LogInformation("Azure credential: signed in with {Source}", source.GetType().Name);
+                return token;
+            }
+            catch (CredentialUnavailableException ex)
+            {
+                unavailable.Add(ex);
+            }
+        }
+
+        throw new CredentialUnavailableException(
+            "No developer sign-in is available. Run 'az login' (or sign in to Visual Studio, VS Code or Azure PowerShell). " +
+            string.Join(" ", unavailable.Select(e => e.Message)),
+            new AggregateException(unavailable));
     }
 }
 
