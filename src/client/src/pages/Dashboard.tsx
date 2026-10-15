@@ -12,6 +12,7 @@ import { useWorkspace } from '../auth/useWorkspace';
 import { getAnalyticsRules, getIngestion, getDataConnectors, getDcr } from '../services/api';
 import type { AnalyticsRulesResponse, IngestionResponse, DataConnectorsResponse, DcrResponse } from '../types';
 import { useChartTheme } from '../hooks/useTheme';
+import { isDcrPageEnabled } from '../config/runtimeConfig';
 
 const SEVERITY_COLORS: Record<string, string> = {
   High:          '#ef4444',
@@ -47,6 +48,8 @@ export default function Dashboard() {
   const [settledKey, setSettledKey] = useState<string | null>(null);
   const loading = !selectedWorkspace || settledKey !== selectedWorkspace.resourceId;
   const chart = useChartTheme();
+  // Read at render time: the runtime config is loaded after this module is imported.
+  const showDcr = isDcrPageEnabled();
 
   useEffect(() => {
     if (!selectedWorkspace) return;
@@ -55,7 +58,8 @@ export default function Dashboard() {
     async function fetchAll() {
       try {
         const [a, i, c, d] = await Promise.allSettled([
-          getAnalyticsRules(ws), getIngestion(ws), getDataConnectors(ws), getDcr(ws),
+          getAnalyticsRules(ws), getIngestion(ws), getDataConnectors(ws),
+          showDcr ? getDcr(ws) : Promise.reject(new Error('DCR page disabled')),
         ]);
         if (a.status === 'fulfilled') setAnalytics(a.value);
         if (i.status === 'fulfilled') setIngestion(i.value);
@@ -68,7 +72,7 @@ export default function Dashboard() {
     fetchAll();
     const interval = setInterval(fetchAll, 60_000);
     return () => clearInterval(interval);
-  }, [selectedWorkspace]);
+  }, [selectedWorkspace, showDcr]);
 
   // ── Derived data ──────────────────────────────────────────────────────────
   const allRules = useMemo(() => {
@@ -148,13 +152,15 @@ export default function Dashboard() {
           icon={connectorErrorCount > 0 ? <AlertTriangle size={24} /> : <Cable size={24} />}
           color={connectorErrorCount > 0 ? 'red' : connectorWarnCount > 0 ? 'yellow' : 'green'}
         />
-        <StatusCard
-          title="DCR Status"
-          value={`${dcr?.healthyCount ?? '-'} / ${dcr?.totalCount ?? '-'}`}
-          subtitle={dcrErrors > 0 ? `${dcrErrors} error${dcrErrors > 1 ? 's' : ''}` : 'All receiving data'}
-          icon={dcrErrors > 0 ? <AlertTriangle size={24} /> : <CheckCircle size={24} />}
-          color={dcrErrors > 0 ? 'yellow' : 'green'}
-        />
+        {showDcr && (
+          <StatusCard
+            title="DCR Status"
+            value={`${dcr?.healthyCount ?? '-'} / ${dcr?.totalCount ?? '-'}`}
+            subtitle={dcrErrors > 0 ? `${dcrErrors} error${dcrErrors > 1 ? 's' : ''}` : 'All receiving data'}
+            icon={dcrErrors > 0 ? <AlertTriangle size={24} /> : <CheckCircle size={24} />}
+            color={dcrErrors > 0 ? 'yellow' : 'green'}
+          />
+        )}
       </div>
 
       {/* ── Connector error banner ── */}

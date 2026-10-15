@@ -12,8 +12,9 @@ import {
   LogOut,
 } from 'lucide-react';
 import WorkspaceSelector from './WorkspaceSelector';
+import { isDcrPageEnabled } from '../config/runtimeConfig';
 
-const navItems = [
+const allNavItems = [
   { to: '/', icon: LayoutDashboard, label: 'Dashboard' },
   { to: '/analytics-rules', icon: ShieldAlert, label: 'Analytics Rules' },
   { to: '/ingestion', icon: Database, label: 'Log Ingestion' },
@@ -30,6 +31,8 @@ interface SidebarProps {
 export default function Sidebar({ theme, onToggleTheme }: SidebarProps) {
   const { instance, accounts } = useMsal();
   const account = accounts[0];
+  // Read at render time: the runtime config is loaded after this module is imported.
+  const navItems = allNavItems.filter((item) => item.to !== '/dcr' || isDcrPageEnabled());
 
   return (
     <aside className="sidebar">

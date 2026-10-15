@@ -1,3 +1,6 @@
+using Microsoft.Extensions.Options;
+using SentinelWatcher.Api.Models;
+
 namespace SentinelWatcher.Api.Endpoints;
 
 /// <summary>
@@ -11,7 +14,7 @@ public static class ClientConfigEndpoint
 
     public static IEndpointRouteBuilder MapClientConfig(this IEndpointRouteBuilder app)
     {
-        app.MapGet(Path, (IConfiguration config, HttpContext http) =>
+        app.MapGet(Path, (IConfiguration config, IOptions<SentinelOptions> sentinel, HttpContext http) =>
         {
             http.Response.Headers.CacheControl = "no-store";
 
@@ -30,11 +33,15 @@ public static class ClientConfigEndpoint
                 ClientId: clientId,
                 TenantId: tenantId,
                 Authority: $"{instance}/{tenantId}",
-                ApiScope: $"api://{clientId}/access_as_user"));
+                ApiScope: $"api://{clientId}/access_as_user",
+                Features: new ClientFeatures(DcrPage: sentinel.Value.EnableDcrPage)));
         }).AllowAnonymous();
 
         return app;
     }
 }
 
-public record ClientConfig(string ClientId, string TenantId, string Authority, string ApiScope);
+public record ClientConfig(string ClientId, string TenantId, string Authority, string ApiScope, ClientFeatures Features);
+
+/// <summary>Pages that can be turned off in configuration.</summary>
+public record ClientFeatures(bool DcrPage);

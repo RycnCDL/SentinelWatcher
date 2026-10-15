@@ -5,6 +5,15 @@ export interface RuntimeConfig {
   tenantId: string;
   authority: string;
   apiScope: string;
+  // Pages that can be turned off on the server (Sentinel:EnableDcrPage).
+  features: { dcrPage: boolean };
+}
+
+let current: RuntimeConfig | null = null;
+
+// The DCR page is shown unless the server turned it off.
+export function isDcrPageEnabled(): boolean {
+  return current?.features?.dcrPage !== false;
 }
 
 export async function loadRuntimeConfig(): Promise<RuntimeConfig> {
@@ -20,5 +29,6 @@ export async function loadRuntimeConfig(): Promise<RuntimeConfig> {
   if (!config?.clientId || !config.tenantId || !config.authority || !config.apiScope) {
     throw new Error('The /config.json response is incomplete.');
   }
-  return config as RuntimeConfig;
+  current = config as RuntimeConfig;
+  return current;
 }

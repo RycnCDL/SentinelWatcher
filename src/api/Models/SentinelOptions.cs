@@ -19,4 +19,10 @@ public class SentinelOptions
     /// When empty, DefaultAzureCredential is used (for local development with az login).
     /// </summary>
     public string? ManagedIdentityClientId { get; set; }
+
+    /// <summary>
+    /// Shows the Data Collection Rules page. When false, /api/dcr returns 404, the client hides
+    /// the page, and the identity needs no access to Microsoft.Insights/dataCollectionRules.
+    /// </summary>
+    public bool EnableDcrPage { get; set; } = true;
 }
