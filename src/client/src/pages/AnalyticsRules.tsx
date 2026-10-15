@@ -9,7 +9,7 @@ import {
   ResponsiveContainer,
   Cell,
 } from 'recharts';
-import { RefreshCw } from 'lucide-react';
+import { RefreshCw, ShieldCheck } from 'lucide-react';
 import { useWorkspace } from '../auth/useWorkspace';
 import { getAnalyticsRules, refreshAnalyticsRules } from '../services/api';
 import { useChartTheme } from '../hooks/useTheme';
@@ -22,6 +22,72 @@ const SEVERITY_COLORS: Record<string, string> = {
   Informational: '#6B7280',
   Unknown: '#6B7280',
 };
+
+function formatDate(iso: string | null, fallback = '-') {
+  return iso ? new Date(iso).toLocaleString() : fallback;
+}
+
+// Where the incidents of the last 30 days come from: existing rules, rules that no longer
+// exist, and incidents without an analytics rule. The rows add up to the total, except when
+// an incident references several rules (it then counts once per rule).
+function IncidentSources({ data }: { data: AnalyticsRulesResponse }) {
+  const sum = data.incidentsFromExistingRules + data.incidentsFromMissingRules + data.incidentsWithoutRule;
+
+  return (
+    <div className="section">
+      <h3>Where incidents come from (30 days)</h3>
+      <table className="data-table">
+        <thead>
+          <tr>
+            <th>Source</th>
+            <th className="text-right">Incidents</th>
+            <th>Last Incident</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Existing analytics rules ({data.totalRules})</td>
+            <td className="text-right">{data.incidentsFromExistingRules}</td>
+            <td>-</td>
+          </tr>
+          {data.missingRules.map((m) => (
+            <tr key={m.ruleId}>
+              <td>
+                Rule deleted or not found
+                <div className="meta-text" style={{ marginTop: '0.2rem' }}>
+                  ID {m.ruleId}
+                  {m.sampleIncidentTitle && <> | e.g. incident "{m.sampleIncidentTitle}"</>}
+                </div>
+              </td>
+              <td className="text-right">{m.incidentCount}</td>
+              <td>{formatDate(m.lastIncident)}</td>
+            </tr>
+          ))}
+          {data.noRuleSources.map((s) => (
+            <tr key={s.provider}>
+              <td>{s.label}</td>
+              <td className="text-right">{s.incidentCount}</td>
+              <td>{formatDate(s.lastIncident)}</td>
+            </tr>
+          ))}
+        </tbody>
+        <tfoot>
+          <tr>
+            <td><strong>Total incidents</strong></td>
+            <td className="text-right"><strong>{data.totalIncidents}</strong></td>
+            <td />
+          </tr>
+        </tfoot>
+      </table>
+      {sum > data.totalIncidents && (
+        <p className="meta-text" style={{ marginTop: '0.75rem' }}>
+          Some incidents reference several analytics rules and are counted once per rule above, so the
+          rows add up to {sum}.
+        </p>
+      )}
+    </div>
+  );
+}
 
 export default function AnalyticsRules() {
   const { selectedWorkspace } = useWorkspace();
@@ -73,76 +139,95 @@ export default function AnalyticsRules() {
         <h2 className="page-title">Analytics Rules</h2>
         <div className="page-meta">
           <span className="meta-text">
-            {data.totalRules} rules | {data.totalIncidents} incidents (30d) |
+            {data.totalRules} rules |{' '}
+            {data.incidentsLoaded ? `${data.totalIncidents} incidents (30d)` : 'loading incidents...'} |
             Last refresh: {new Date(data.lastRefreshed).toLocaleTimeString()}
           </span>
           <button
             className="btn btn--icon"
             onClick={handleRefresh}
             disabled={refreshing}
+            title="Refresh"
           >
             <RefreshCw size={16} className={refreshing ? 'spinning' : ''} />
           </button>
         </div>
       </div>
 
+      {data.incidentsLoaded && <IncidentSources data={data} />}
+
       <div className="section">
         <h3>Top 20 Rules: Most Incidents</h3>
-        <div className="chart-container">
-          <ResponsiveContainer width="100%" height={500}>
-            <BarChart data={topChartData} layout="vertical" margin={{ left: 200 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke={gridStroke} />
-              <XAxis type="number" stroke={axisStroke} tick={{ fill: axisStroke, fontSize: 12 }} />
-              <YAxis
-                type="category"
-                dataKey="name"
-                stroke={axisStroke}
-                width={190}
-                tick={{ fill: axisTickFill, fontSize: 12 }}
-              />
-              <Tooltip contentStyle={tooltipStyle} />
-              <Bar dataKey="incidents" radius={[0, 4, 4, 0]}>
-                {topChartData.map((entry, index) => (
-                  <Cell
-                    key={`cell-${index}`}
-                    fill={SEVERITY_COLORS[entry.severity] || '#3B82F6'}
+        {!data.incidentsLoaded ? (
+          <p className="meta-text" style={{ textAlign: 'center', padding: '2rem 0' }}>Loading incident counts...</p>
+        ) : topChartData.length === 0 ? (
+          <div style={{ textAlign: 'center', padding: '2.5rem 1rem' }}>
+            <ShieldCheck size={36} style={{ color: 'var(--text-muted)', marginBottom: '0.75rem' }} />
+            <p style={{ color: 'var(--text-primary)', fontWeight: 600, margin: 0 }}>
+              No incidents from existing analytics rules in the last 30 days
+            </p>
+            {data.totalIncidents > 0 && (
+              <p className="meta-text" style={{ marginTop: '0.5rem' }}>
+                All {data.totalIncidents} incidents come from deleted rules or have no analytics rule. See the
+                table above.
+              </p>
+            )}
+          </div>
+        ) : (
+          <>
+            <div className="chart-container">
+              <ResponsiveContainer width="100%" height={Math.max(200, topChartData.length * 26)}>
+                <BarChart data={topChartData} layout="vertical" margin={{ left: 200 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke={gridStroke} />
+                  <XAxis type="number" allowDecimals={false} stroke={axisStroke} tick={{ fill: axisStroke, fontSize: 12 }} />
+                  <YAxis
+                    type="category"
+                    dataKey="name"
+                    stroke={axisStroke}
+                    width={190}
+                    tick={{ fill: axisTickFill, fontSize: 12 }}
                   />
-                ))}
-              </Bar>
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
+                  <Tooltip contentStyle={tooltipStyle} />
+                  <Bar dataKey="incidents" radius={[0, 4, 4, 0]}>
+                    {topChartData.map((entry, index) => (
+                      <Cell
+                        key={`cell-${index}`}
+                        fill={SEVERITY_COLORS[entry.severity] || '#3B82F6'}
+                      />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
 
-        <table className="data-table">
-          <thead>
-            <tr>
-              <th>Rule Name</th>
-              <th>Severity</th>
-              <th>Enabled</th>
-              <th>Incidents</th>
-              <th>Last Incident</th>
-            </tr>
-          </thead>
-          <tbody>
-            {data.top20MostIncidents.map((r) => (
-              <tr key={r.ruleId}>
-                <td>{r.ruleName}</td>
-                <td>
-                  <span className={`badge badge--${r.severity.toLowerCase()}`}>
-                    {r.severity}
-                  </span>
-                </td>
-                <td>{r.enabled ? 'Yes' : 'No'}</td>
-                <td className="text-right">{r.incidentCount}</td>
-                <td>
-                  {r.lastIncident
-                    ? new Date(r.lastIncident).toLocaleString()
-                    : '-'}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th>Rule Name</th>
+                  <th>Severity</th>
+                  <th>Enabled</th>
+                  <th className="text-right">Incidents</th>
+                  <th>Last Incident</th>
+                </tr>
+              </thead>
+              <tbody>
+                {data.top20MostIncidents.map((r) => (
+                  <tr key={r.ruleId}>
+                    <td>{r.ruleName}</td>
+                    <td>
+                      <span className={`badge badge--${r.severity.toLowerCase()}`}>
+                        {r.severity}
+                      </span>
+                    </td>
+                    <td>{r.enabled ? 'Yes' : 'No'}</td>
+                    <td className="text-right">{r.incidentCount}</td>
+                    <td>{formatDate(r.lastIncident)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </>
+        )}
       </div>
 
       <div className="section">
@@ -152,7 +237,7 @@ export default function AnalyticsRules() {
             <tr>
               <th>Rule Name</th>
               <th>Severity</th>
-              <th>Incidents</th>
+              <th className="text-right">Incidents</th>
               <th>Last Incident</th>
             </tr>
           </thead>
@@ -165,12 +250,8 @@ export default function AnalyticsRules() {
                     {r.severity}
                   </span>
                 </td>
-                <td className="text-right">{r.incidentCount}</td>
-                <td>
-                  {r.lastIncident
-                    ? new Date(r.lastIncident).toLocaleString()
-                    : 'Never'}
-                </td>
+                <td className="text-right">{data.incidentsLoaded ? r.incidentCount : '...'}</td>
+                <td>{formatDate(r.lastIncident, 'Never')}</td>
               </tr>
             ))}
           </tbody>

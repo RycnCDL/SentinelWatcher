@@ -21,81 +21,58 @@ public class LogAnalyticsService
         _logger = logger;
     }
 
+    // One row per incident (latest update), for incidents created in the last 30 days, then grouped
+    // by rule. SecurityIncident has a row per incident update, so counting rows overstates incidents.
+    // Incidents without a rule (for example from Microsoft Defender XDR) are grouped by provider.
+    // TotalIncidents counts each incident once, also when it references several rules.
+    private const string IncidentsKql = @"
+        let incidents = materialize(
+            SecurityIncident
+            | where TimeGenerated > ago(30d)
+            | summarize arg_max(TimeGenerated, CreatedTime, Title, ProviderName, RelatedAnalyticRuleIds) by IncidentName
+            | where CreatedTime > ago(30d));
+        let total = toscalar(incidents | count);
+        incidents
+        | extend RuleIds = iff(array_length(RelatedAnalyticRuleIds) > 0, RelatedAnalyticRuleIds, dynamic(['']))
+        | mv-expand RuleId = RuleIds to typeof(string)
+        | extend RuleId = tolower(tostring(split(RuleId, '/')[-1]))
+        | summarize CreatedTime = take_any(CreatedTime), Title = take_any(Title), ProviderName = take_any(ProviderName)
+            by IncidentName, RuleId
+        | summarize IncidentCount = count(), LastIncident = max(CreatedTime), SampleTitle = take_any(Title)
+            by RuleId, Provider = iff(isempty(RuleId), ProviderName, '')
+        | extend TotalIncidents = total
+    ";
+
     public async Task<AnalyticsRulesResponse> GetAnalyticsRuleStatsAsync(
         WorkspaceContext workspace,
         List<(string Id, string Name, string Severity, bool Enabled)> rules)
     {
-        var logsClient = _logsClient;
-        var response = new AnalyticsRulesResponse
-        {
-            LastRefreshed = DateTime.UtcNow,
-            TotalRules = rules.Count
-        };
+        var groups = new List<IncidentGroup>();
+        var total = 0;
 
         try
         {
-            var kql = @"
-                SecurityIncident
-                | where TimeGenerated > ago(30d)
-                | extend RuleIds = RelatedAnalyticRuleIds
-                | mv-expand RuleId = RuleIds
-                | summarize
-                    IncidentCount = count(),
-                    LastIncident = max(TimeGenerated)
-                    by tostring(RuleId)
-            ";
+            var result = (await _logsClient.QueryResourceAsync(
+                workspace.ResourceIdentifier, IncidentsKql, LogsQueryTimeRange.All)).Value;
 
-            var result = await logsClient.QueryResourceAsync(workspace.ResourceIdentifier, kql, LogsQueryTimeRange.All);
-
-            var incidentMap = new Dictionary<string, (int Count, DateTime? Last)>();
-            if (result.Value.Status == LogsQueryResultStatus.Success)
+            foreach (var row in result.Table.Rows)
             {
-                foreach (var row in result.Value.Table.Rows)
-                {
-                    var ruleId = row.GetString("RuleId") ?? "";
-                    var guidPart = ruleId.Contains("/")
-                        ? ruleId.Split('/').Last()
-                        : ruleId;
-                    var count = row.GetInt32("IncidentCount") ?? 0;
-                    var last = row.GetDateTimeOffset("LastIncident")?.UtcDateTime;
-                    incidentMap[guidPart.ToLower()] = (count, last);
-                }
+                total = (int)(row.GetInt64("TotalIncidents") ?? total);
+                groups.Add(new IncidentGroup(
+                    RuleId: row.GetString("RuleId") ?? "",
+                    Provider: row.GetString("Provider") ?? "",
+                    IncidentCount: (int)(row.GetInt64("IncidentCount") ?? 0),
+                    LastIncident: row.GetDateTimeOffset("LastIncident")?.UtcDateTime,
+                    SampleTitle: row.GetString("SampleTitle")));
             }
-
-            response.TotalIncidents = incidentMap.Values.Sum(x => x.Count);
-
-            var allStats = rules.Select(r =>
-            {
-                var ruleGuid = r.Id.Contains("/") ? r.Id.Split('/').Last() : r.Id;
-                incidentMap.TryGetValue(ruleGuid.ToLower(), out var incidents);
-                return new AnalyticsRuleStats
-                {
-                    RuleId = r.Id,
-                    RuleName = r.Name,
-                    Severity = r.Severity,
-                    Enabled = r.Enabled,
-                    IncidentCount = incidents.Count,
-                    LastIncident = incidents.Last
-                };
-            }).ToList();
-
-            response.Top20MostIncidents = allStats
-                .OrderByDescending(r => r.IncidentCount)
-                .Take(20)
-                .ToList();
-
-            response.Top20LeastIncidents = allStats
-                .Where(r => r.Enabled)
-                .OrderBy(r => r.IncidentCount)
-                .Take(20)
-                .ToList();
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is not OperationCanceledException)
         {
-            _logger.LogError(ex, "Failed to query analytics rule stats");
+            _logger.LogError(ex, "Failed to query incidents for workspace {Workspace}", workspace.WorkspaceName);
         }
 
-        return response;
+        // Titles are only sent for rules that no longer exist, as a hint to which rule it was.
+        return IncidentAttribution.Build(rules, groups, total, incidentsLoaded: true);
     }
 
     public async Task<IngestionResponse> GetIngestionStatsAsync(WorkspaceContext workspace)

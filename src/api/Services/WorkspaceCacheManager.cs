@@ -152,16 +152,8 @@ public class WorkspaceCacheManager
             await Task.WhenAll(connectorsTask, dcrTask);
 
             // Rule list without incident counts, so the rules table can render before Phase 2.
-            entry.AnalyticsRules ??= new AnalyticsRulesResponse
-            {
-                TotalRules = rules.Count,
-                LastRefreshed = DateTime.UtcNow,
-                Top20MostIncidents = rules
-                    .OrderBy(r => r.Name)
-                    .Take(20)
-                    .Select(r => new AnalyticsRuleStats { RuleId = r.Id, RuleName = r.Name, Severity = r.Severity, Enabled = r.Enabled })
-                    .ToList(),
-            };
+            entry.AnalyticsRules ??= IncidentAttribution.Build(
+                rules, Array.Empty<IncidentGroup>(), totalIncidents: 0, incidentsLoaded: false);
             entry.Ingestion  = ingestion;
             entry.Connectors = connectorsTask.Result;
             entry.Dcr        = dcrTask.Result;

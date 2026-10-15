@@ -7,11 +7,36 @@ export interface AnalyticsRuleStats {
   lastIncident: string | null;
 }
 
+// Incidents that reference an analytics rule that no longer exists.
+export interface MissingRuleIncidents {
+  ruleId: string;
+  incidentCount: number;
+  lastIncident: string | null;
+  sampleIncidentTitle: string | null;
+}
+
+// Incidents without an analytics rule, per incident provider.
+export interface NoRuleIncidents {
+  provider: string;
+  label: string;
+  incidentCount: number;
+  lastIncident: string | null;
+}
+
 export interface AnalyticsRulesResponse {
+  // Existing rules with at least one incident.
   top20MostIncidents: AnalyticsRuleStats[];
   top20LeastIncidents: AnalyticsRuleStats[];
   totalRules: number;
+  // False while only the rule list is loaded.
+  incidentsLoaded: boolean;
+  // Distinct incidents created in the last 30 days.
   totalIncidents: number;
+  incidentsFromExistingRules: number;
+  incidentsFromMissingRules: number;
+  incidentsWithoutRule: number;
+  missingRules: MissingRuleIncidents[];
+  noRuleSources: NoRuleIncidents[];
   lastRefreshed: string;
 }
 

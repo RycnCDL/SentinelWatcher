@@ -224,7 +224,7 @@ export default function Dashboard() {
                 <div style={{ display: 'flex', gap: '1rem', fontSize: '0.78rem', color: 'var(--text-muted)', alignItems: 'center' }}>
                   <span style={{ color: 'var(--healthy)' }}>● {enabledCount} enabled</span>
                   {disabledCount > 0 && <span style={{ color: 'var(--danger)' }}>● {disabledCount} disabled</span>}
-                  {analytics.totalIncidents > 0
+                  {analytics.incidentsLoaded
                     ? <span style={{ color: 'var(--warning)' }}>{rulesWithIncidents} firing</span>
                     : <span style={{ color: 'var(--text-muted)', fontStyle: 'italic' }}>loading incidents…</span>
                   }
@@ -260,11 +260,19 @@ export default function Dashboard() {
                         </span>
                       </td>
                       <td style={{ textAlign: 'right', fontWeight: 700, color: r.incidentCount > 0 ? 'var(--warning)' : 'var(--text-muted)' }}>
-                        {analytics.totalIncidents > 0 ? r.incidentCount : <span style={{ fontSize: '0.7rem', fontStyle: 'italic' }}>…</span>}
+                        {analytics.incidentsLoaded ? r.incidentCount : <span style={{ fontSize: '0.7rem', fontStyle: 'italic' }}>…</span>}
                       </td>
                       <td><RelativeTime iso={r.lastIncident} /></td>
                     </tr>
                   ))}
+                  {analytics.incidentsLoaded && analytics.top20MostIncidents.length === 0 && (
+                    <tr>
+                      <td colSpan={5} style={{ color: 'var(--text-muted)', textAlign: 'center' }}>
+                        No incidents from existing analytics rules in the last 30 days
+                        {analytics.totalIncidents > 0 && ` (${analytics.totalIncidents} incidents from other sources, see Analytics Rules)`}
+                      </td>
+                    </tr>
+                  )}
                 </tbody>
               </table>
             </div>
@@ -312,7 +320,7 @@ export default function Dashboard() {
             <h3>Quick Stats</h3>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
               {[
-                { icon: <ShieldCheck size={14} />, label: 'Rules with incidents',  value: analytics ? (analytics.totalIncidents > 0 ? rulesWithIncidents : '…') : '-', color: rulesWithIncidents > 0 ? 'var(--warning)' : 'var(--healthy)' },
+                { icon: <ShieldCheck size={14} />, label: 'Rules with incidents',  value: analytics ? (analytics.incidentsLoaded ? rulesWithIncidents : '…') : '-', color: rulesWithIncidents > 0 ? 'var(--warning)' : 'var(--healthy)' },
                 { icon: <Activity     size={14} />, label: 'Total incidents (30d)', value: analytics?.totalIncidents ?? '-', color: (analytics?.totalIncidents ?? 0) > 0 ? 'var(--warning)' : 'var(--text-primary)' },
                 { icon: <TrendingUp   size={14} />, label: 'Daily avg ingestion',   value: ingestion ? `${(ingestion.totalVolumeGB / (ingestion.daysAnalyzed || 30)).toFixed(2)} GB` : '-', color: 'var(--text-primary)' },
                 { icon: <Database     size={14} />, label: 'Ingestion tables',      value: ingestion?.tables?.length ?? '-', color: 'var(--text-primary)' },
